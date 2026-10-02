@@ -4,8 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import com.bloomcycle.app.ui.BloomApp
 import com.bloomcycle.app.ui.theme.BloomTheme
 
 class MainActivity : ComponentActivity() {
@@ -14,13 +13,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             BloomTheme {
-                Placeholder()
+                BloomApp()
             }
         }
     }
-}
-
-@Composable
-private fun Placeholder() {
-    Text("Bloom")
 }
