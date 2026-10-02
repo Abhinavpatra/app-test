@@ -102,13 +102,20 @@ object PhaseResolver {
 
     /**
      * A soft read on regularity for the UI. Nothing here is a diagnosis — it is a
-     * description of the logged data and nothing more.
+     * description of the logged data and nothing more. When the logged average sits
+     * outside the typical 21-35 day band, the read says so instead of just calling the
+     * pattern consistent (plan.md §8.4).
      */
-    fun describeReadiness(cycles: List<Cycle>): String = when {
-        cycles.isEmpty() -> "No cycles logged yet"
-        CycleCalculator.lengthsForStats(cycles).size < 3 -> "Still learning your rhythm"
-        CycleCalculator.regularityDays(cycles) <= 2.0 -> "Your rhythm looks consistent"
-        CycleCalculator.regularityDays(cycles) <= 4.0 -> "Your rhythm varies a little"
-        else -> "Your rhythm is fairly unpredictable right now"
+    fun describeReadiness(cycles: List<Cycle>): String {
+        val base = when {
+            cycles.isEmpty() -> "No cycles logged yet"
+            CycleCalculator.lengthsForStats(cycles).size < 3 -> "Still learning your rhythm"
+            CycleCalculator.regularityDays(cycles) <= 2.0 -> "Your rhythm looks consistent"
+            CycleCalculator.regularityDays(cycles) <= 4.0 -> "Your rhythm varies a little"
+            else -> "Your rhythm is fairly unpredictable right now"
+        }
+        val note = CycleCalculator.typicalityNote(CycleCalculator.lengthsForStats(cycles))
+            ?: return base
+        return "$base — your cycles run $note"
     }
 }

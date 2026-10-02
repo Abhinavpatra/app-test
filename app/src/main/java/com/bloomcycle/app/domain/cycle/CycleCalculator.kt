@@ -2,6 +2,7 @@ package com.bloomcycle.app.domain.cycle
 
 import com.bloomcycle.app.core.time.CycleDate
 import com.bloomcycle.app.domain.model.Cycle
+import com.bloomcycle.app.domain.model.CycleContext
 import com.bloomcycle.app.domain.model.CyclePrediction
 import com.bloomcycle.app.domain.model.PeriodEvent
 import com.bloomcycle.app.domain.model.PredictionConfidence
@@ -40,6 +41,14 @@ object CycleCalculator {
 
     private const val PLAUSIBLE_PERIOD_MIN = 1
     private const val PLAUSIBLE_PERIOD_MAX = 14
+
+    /**
+     * The band most people and most guidance describe as a typical adult cycle.
+     * Longer and shorter cycles are perfectly real and are *computed* — this band only
+     * decides how gently the wording needs to be pitched. See [outsideTypicalRange].
+     */
+    const val TYPICAL_MIN = 21
+    const val TYPICAL_MAX = 35
 
     data class Assumptions(
         val defaultCycleLength: Int = DEFAULT_CYCLE_LENGTH,
@@ -135,11 +144,53 @@ object CycleCalculator {
         return sqrt(variance)
     }
 
-    fun regularityLabel(cycles: List<Cycle>): String = when {
-        lengthsForStats(cycles).size < 3 -> "Not enough history yet"
-        regularityDays(cycles) <= 2.0 -> "Very consistent"
-        regularityDays(cycles) <= 4.0 -> "Varies a little"
-        else -> "Irregular"
+    /**
+     * True when the user's own average sits outside 21-35 days.
+     *
+     * This is deliberately *not* a health judgement and does not change the numbers —
+     * a steady 40-day pattern is still averaged as 40 days. It only tells the UI to
+     * soften its language, because "very consistent" attached to a 40-day average reads
+     * as reassurance that nothing here has actually been established.
+     */
+    fun outsideTypicalRange(cycles: List<Cycle>): Boolean = outsideTypical(lengthsForStats(cycles))
+
+    // Named rather than overloaded: List<Cycle> and List<Int> erase to the same JVM
+    // signature, and two functions there are a platform declaration clash (the same trap
+    // that forced median -> medianOf).
+    private fun outsideTypical(lengths: List<Int>): Boolean {
+        if (lengths.isEmpty()) return false
+        val mean = robustMean(lengths)
+        return mean < TYPICAL_MIN || mean > TYPICAL_MAX
+    }
+
+    /**
+     * `"around 40 days, which is longer than typical"`, or null when the average sits
+     * inside the typical band. Shared by the regularity label and the readiness read so
+     * the same history never gets described two different ways.
+     */
+    fun typicalityNote(lengths: List<Int>): String? {
+        if (!outsideTypical(lengths)) return null
+        val mean = robustMean(lengths).roundToInt()
+        val direction = if (mean > TYPICAL_MAX) "longer than typical" else "shorter than typical"
+        return "around $mean days, which is $direction"
+    }
+
+    /**
+     * A plain consistency verdict, softened with an honest note about the actual length
+     * when that length falls outside the typical band (plan.md §8.4).
+     */
+    fun regularityLabel(cycles: List<Cycle>): String {
+        val lengths = lengthsForStats(cycles)
+        if (lengths.size < 3) return "Not enough history yet"
+
+        val base = when {
+            regularityOf(lengths) <= 2.0 -> "Very consistent"
+            regularityOf(lengths) <= 4.0 -> "Varies a little"
+            else -> "Irregular"
+        }
+
+        val note = typicalityNote(lengths) ?: return base
+        return "$base — $note"
     }
 
     /**
@@ -173,18 +224,27 @@ object CycleCalculator {
     /**
      * Returns null when there is nothing logged yet to predict from — the UI shows onboarding
      * instead of a fabricated prediction.
+     *
+     * Also returns null for [CycleContext.HORMONAL_CONTRACEPTION], because ovulation is
+     * suppressed and there is no cycle to predict: showing a date there would be fiction
+     * presented as data. Perimenopause and postpartum still predict, but caveated and
+     * pinned to LOW confidence (plan.md §8.4).
      */
     fun predict(
         cycles: List<Cycle>,
         today: CycleDate,
+        context: CycleContext = CycleContext.NONE,
         assumptions: Assumptions = Assumptions(),
     ): CyclePrediction? {
+        if (context == CycleContext.HORMONAL_CONTRACEPTION) return null
+
         val anchor = cycles.lastOrNull() ?: return null
         val lengths = lengthsForStats(cycles)
         val avgLength = averageCycleLength(cycles, assumptions)
         val avgDuration = averagePeriodDuration(cycles, assumptions)
         val regularity = regularityOf(lengths)
         val luteal = lutealPhaseLength(cycles, assumptions)
+        val caveated = context != CycleContext.NONE
 
         // A period that has not arrived yet is reported as *late*, with a negative day count.
         // Quietly rolling the projection forward would hide exactly the signal the user is
@@ -204,7 +264,9 @@ object CycleCalculator {
             fertileWindowEnd = ovulation.plusDays(1),
             pmsWindowStart = nextStart.minusDays(6),
             pmsWindowEnd = nextStart.minusDays(1),
-            confidence = confidence(cycles),
+            // A caveated context caps confidence regardless of how tidy the history looks:
+            // a regular-looking streak of withdrawal bleeds is not evidence of ovulation.
+            confidence = if (caveated) PredictionConfidence.LOW else confidence(cycles),
             averageCycleLength = avgLength,
             averagePeriodDuration = avgDuration,
             lutealPhaseLength = luteal,
@@ -213,6 +275,7 @@ object CycleCalculator {
             regularityLabel = regularityLabel(cycles),
             isLate = daysUntil < 0,
             daysUntilNextPeriod = daysUntil.toLong(),
+            context = context,
         )
     }
 
