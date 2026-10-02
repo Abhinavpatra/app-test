@@ -1,7 +1,7 @@
 # Implementation Plan — Period Tracking App ("Bloom")
 
-Status: **in progress.** Phases 0–2 done and merged. Phase 3 and Phase 4 are code-complete but
-have open spec gaps (listed per phase below). Phases 5–12 not started.
+Status: **in progress.** Phases 0–3 done and merged. Phase 4 is code-complete but missing its
+instrumentation tests and Room schema export. Phases 5–12 not started.
 Last reviewed: 2026-10-02
 Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 
@@ -9,7 +9,7 @@ Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 push → open PR with `gh` → merge into `main` → delete the branch. Never push directly to `main`.
 
 **Verified green:** `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL,
-33/33 unit tests (CycleCalculator 22, PhaseResolver 11).
+42/42 unit tests (CycleCalculator 31, PhaseResolver 11).
 
 ---
 
@@ -21,9 +21,11 @@ refactor. Everything in `README.md` had to be written from scratch.
 Recommended sequencing, in priority order (phase numbers match §10):
 
 1. ✅ **Foundation, infra, design system + app shell** (Phases 0–2). Done and merged.
-2. **Cycle calculation engine + its unit tests** (Phase 3 ⭐). This is the product. Pure Kotlin, no UI
-   dependencies, and where all real correctness risk lives.
-3. **Encrypted local persistence** (Phase 4). README explicitly requires DB encryption with a local key.
+2. ✅ **Cycle calculation engine + its unit tests** (Phase 3 ⭐). Done and merged — 42 tests, every
+   §8.4 edge case covered. This is the product: pure Kotlin, no UI dependencies, and where all real
+   correctness risk lived.
+3. ⚠️ **Encrypted local persistence** (Phase 4). Code done (SQLCipher + Keystore + backup excludes);
+   schema export and instrumentation tests still outstanding.
 4. **Calendar + logging** (Phases 5–6). The minimum viable loop: user logs a period, sees it on a calendar.
 5. Everything else in the README is layered on top of that loop.
 
@@ -34,10 +36,10 @@ payments and live chat.
 
 ## 2. Current State — What Actually Exists
 
-The template is gone. This is now a real codebase: **41 Kotlin source files, 33 passing tests, a
-Fraunces/Karla type system, and 2 merged PRs.**
+The template is gone. This is now a real codebase: **41 Kotlin source files, 42 passing tests, a
+Fraunces/Karla type system, and one merged PR per completed phase.**
 
-### Done (Phases 0–2, plus partial 3 and 4)
+### Done (Phases 0–3, plus most of 4)
 
 | Area | Files |
 |---|---|
@@ -53,7 +55,7 @@ Fraunces/Karla type system, and 2 merged PRs.**
 | Shell | `ui/BloomApp.kt`, `ui/navigation/BloomDestination.kt`, `ui/phase/PhaseVisuals.kt` |
 | Components | `ui/components/{Components,Placeholder}.kt` |
 | Screens | `ui/screens/{Home,Calendar,Insights,Chat,Settings}Screen.kt` (logged-out placeholders) |
-| Tests | `src/test/.../CycleCalculatorTest.kt` (22), `PhaseResolverTest.kt` (11) |
+| Tests | `src/test/.../CycleCalculatorTest.kt` (31), `PhaseResolverTest.kt` (11) |
 
 ### Removed from the template
 
@@ -63,17 +65,16 @@ Fraunces/Karla type system, and 2 merged PRs.**
 
 ### Git state
 
-```
-1a0c2ec init
-65519a6 few persistent errors remain
-cb7ea19 Add Fraunces and Karla type system with botanical phase palette   ← PR #1 (phase-2-design-system)
-962a934 Merge pull request #1
-5b90a60 Add app shell with five destinations and shared components       ← PR #2 (phase-2-app-shell)
-1e044c8 Merge pull request #2                                             ← origin/main
-```
+One branch → PR → merge per phase, never a direct push to `main`. Pattern:
+
+| Phase | Branch | PR |
+|---|---|---|
+| 2 design system | `phase-2-design-system` | #1 ✅ |
+| 2 app shell | `phase-2-app-shell` | #2 ✅ |
+| 3 cycle engine | `phase-3-cycle-engine` | #3 ✅ |
 
 `origin` = `https://github.com/Abhinavpatra/app-test.git`, `gh` v2.69.0 authenticated as
-`Abhinavpatra`. Working tree clean, `main` in sync.
+`Abhinavpatra`. Run `git log --oneline -10` for the live list.
 
 ### Known gaps (tracked per phase in §10)
 
@@ -82,7 +83,9 @@ cb7ea19 Add Fraunces and Karla type system with botanical phase palette   ← PR
   checkbox still open.
 - **No instrumentation tests at all** — Phase 4's `MigrationTestHelper` and reopen-in-new-process
   tests are unwritten (needs an emulator/device).
-- **No Phase 5+ UI** — all five screens are honest empty placeholders.
+- **No Phase 5+ UI** — all five screens are honest empty placeholders, including the
+  `CycleContext` picker (the domain flag exists and is persisted; nothing lets a user set it yet).
+- **Nothing schedules `ReminderScheduler`** — no settings toggle, no log action, no boot receiver.
 
 ---
 
@@ -281,6 +284,15 @@ Library list:
 - Schema export is currently **off** (`exportSchema = false`, no `room { schemaDirectory(...) }` block)
   — this contradicts §6.3 and must be fixed in Phase 4.
 
+### 5.5 ⚠️ Kotlin gotcha — JVM erasure clashes
+
+Two functions `List<Cycle>` and `List<Int>` erase to the same JVM signature and fail with
+`Platform declaration clash: ... have the same JVM signature (foo(Ljava/util/List;)Z)`. This has
+already cost two rounds: `median` → `medianOf(List<Double>)`, `regularityDays` → `regularityOf`, and
+`outsideTypicalRange(cycles)` → private `outsideTypical(lengths)`. **Name the list-of-primitives
+helper differently instead of overloading it.** The same trap makes `emptyList()` ambiguous when
+both overloads exist — give it an explicit type argument.
+
 **No chart library.** All charts are hand-drawn on Compose `Canvas` (Phase 6). Avoids a dependency
 that fights Compose's layout and keeps the chart set exactly tailored to cycle data.
 
@@ -333,9 +345,9 @@ Supporting:
 - `SymptomCatalog` — static Kotlin object, not a DB table. ✅
 - `UserSettings` — a **domain model** (`Models.kt`) persisted via DataStore, not a Room entity. ✅
   Fields: `onboardingComplete`, `remindersEnabled`, `reminderHour/Minute`, `dailyNoteEnabled`,
-  `predictionsMuted`, `chatDisplayName`, `notificationPermissionAsked`.
-  **Missing (Phase 3 gap):** a `CycleContext` flag for contraception / perimenopause / postpartum —
-  §8.4 requires it.
+  `predictionsMuted`, `cycleContext`, `chatDisplayName`, `notificationPermissionAsked`.
+  `cycleContext` (`CycleContext`, §8.4) is stored by **enum name** with a fallback to `NONE` on an
+  unknown value — a corrupt preference must never make the settings screen unopenable.
 - **`content_items` table: dropped.** Content lives in `domain/content/ContentLibrary.kt` as pure
   Kotlin with stored citations. No seeding, no `res/raw/content_seed.json`, no marker-in-settings.
 - Firestore `chats/{roomId}/messages/{messageId}` — **remote, not Room**. Chat history is cached
@@ -443,9 +455,9 @@ Firebase chat messages leave the device in plaintext to the server. This must be
 
 Pure Kotlin in `domain/cycle`. No Android imports. This is where the product's value lives.
 
-**Status: implemented and tested (22 + 11 tests green), but §8.4 is not fully covered — see the
-per-item status below. `PredictionEngine` and `FertilityCalculator` were folded into
-`CycleCalculator.kt`; `domain/wellness/` and `domain/insight/` are still unwritten.**
+**Status: complete. 42 tests green (31 + 11), every §8.4 edge case covered — see the per-item
+status below. `PredictionEngine` and `FertilityCalculator` were folded into `CycleCalculator.kt`;
+`domain/wellness/` and `domain/insight/` are still unwritten.**
 
 ### 8.1 Terminology
 
@@ -490,11 +502,15 @@ Status against `CycleCalculatorTest` (22) + `PhaseResolverTest` (11):
   `a single logged cycle produces low confidence`.
 - ✅ **Spotting logged as a period** → excluded from cycle-length statistics and never starts a cycle.
   `spotting alone does not start a cycle`.
-- ⚠️ **Very long / very short cycles** (>35 or <21 days) → **partial.** Statistics do compute them
-  (plausible band is 15–60 days, not 21–35) and `regularityLabel` softens the wording, but there is
-  no explicit `outsideTypicalRange(cycles)` signal and no dedicated test for the >35/<21 copy path.
-  The "suppress you're pregnant? prompts" half is vacuously satisfied — no such prompt exists.
-  **TODO (Phase 3 gap 1):** add the helper + test.
+- ⚠️→✅ **Very long / very short cycles** (>35 or <21 days) → **done.** Statistics compute them
+  (plausible band is 15–60 days, not 21–35); `outsideTypicalRange()` detects an average outside
+  21–35; `regularityLabel()` and `PhaseResolver.describeReadiness()` then append an honest note —
+  `"Very consistent — around 40 days, which is longer than typical"`. Numbers and confidence are
+  deliberately **unchanged**: only the wording softens. The "suppress you're pregnant? prompts" half
+  remains vacuously satisfied — no such prompt exists.
+  `a consistently long cycle is still computed but says so in the label`,
+  `a consistently short cycle is flagged as shorter than typical`,
+  `a typical cycle is computed and never flagged`.
 - ✅ **Overlapping or duplicate period events** → merged on write; `startDate` is also a **unique
   index**, so a zero-length cycle is structurally impossible.
   `two events logged on the same day are merged`, `duplicate starting points never produce a zero
@@ -502,11 +518,20 @@ Status against `CycleCalculatorTest` (22) + `PhaseResolverTest` (11):
 - ✅ **Date gaps** (user skipped 3 months) → do not fabricate cycles; excluded from the mean.
   `GAP_THRESHOLD_DAYS = 60`; `a three month logging gap is not treated as a cycle length`,
   `a long logging gap does not pretend a phase`.
-- ❌ **Hormonal contraception / perimenopause / postpartum flags** → **not implemented.** There is no
-  `CycleContext` on `UserSettings`, so nothing suppresses or caveats predictions. This is the single
-  biggest honesty gap in the engine and the main source of genuinely misleading output (R9).
-  **TODO (Phase 3 gap 2):** add the flag, thread it through `SettingsRepository`, suppress or force
-  LOW confidence per §8.4, and test it.
+- ✅ **Hormonal contraception / perimenopause / postpartum flags** → **done.**
+  `CycleContext` on `UserSettings` (`NONE`, `HORMONAL_CONTRACEPTION`, `PERIMENOPAUSE`,
+  `POSTPARTUM`), persisted by enum name in DataStore with a safe fallback to `NONE`.
+  `predict(cycles, today, context)`:
+  - `HORMONAL_CONTRACEPTION` → returns **null** (ovulation is suppressed, there is no cycle to
+    read — silence beats a confident fiction). `ReminderWorker` therefore sends no period reminder.
+  - `PERIMENOPAUSE` / `POSTPARTUM` → still predicts, but `prediction.isCaveated == true` and
+    confidence is forced to **LOW** regardless of how tidy the history looks.
+  - `ReminderWorker` additionally refuses to send the "your period may be close" notification for
+    any caveated prediction; it keeps only the date-neutral check-in.
+  `hormonal contraception suppresses the prediction instead of inventing one`,
+  `perimenopause predictions are caveated and pinned to low confidence`,
+  `postpartum predictions are caveated too`,
+  `a default context prediction is not caveated`.
 
 Also covered beyond the spec: implausible lengths filtered from stats, outlier rejection via
 `robustMean`, clamped luteal so ovulation cannot precede menstruation, late periods reported as
@@ -552,7 +577,7 @@ Confidence rubric:
 | 9 | **Premium:** Best fertility window | 10 | Yes | ⬜ calculator ✅, presentation ⬜ |
 | 10 | **Premium:** Year to conceive — astrology / sports / academic inclinations | 10 | Yes | ⬜ |
 | 11 | "What their cycle says about them" | 10 | Yes | ⬜ |
-| 12 | Long-term prediction + early warning signs | 8 | No (long-term = Yes) | ⚠️ `projectNext()` ✅, Phase 3 caveat gaps open |
+| 12 | Long-term prediction + early warning signs | 8 | No (long-term = Yes) | ✅ engine (`projectNext`, `CycleContext`), ⬜ Premium gate |
 | 13 | Notifications during / before, time-of-month aware | 8 | No | ⚠️ worker + channels ✅, not wired to settings |
 | 14 | **Premium:** Gym / run intensity by cycle phase | 9 | Yes | ⬜ |
 | 15 | Soft inclusive language, smooth adaptive UI | 2, 12 | No | ✅ design system, ⬜ copy review |
@@ -654,29 +679,26 @@ rotation and adaptive layout are in; TalkBack has not been run.
 
 ---
 
-### Phase 3 — Domain & Cycle Engine ⭐ ⚠️ nearly done — 2 spec gaps open
-**Effort:** ~3–5 days · **Highest priority — do not defer** · **Status: code-complete, 33/33 tests green**
+### Phase 3 — Domain & Cycle Engine ⭐ ✅ done
+**Effort:** ~3–5 days · **Highest priority — do not defer** · **Status: complete, 42/42 tests green**
 
 - [x] `domain/model/` — `Cycle`, `PeriodEvent` (was `PeriodLog`), `FlowLevel`, `SymptomLog`,
-      `PhaseType`, `CyclePrediction`, `PhaseState`, `PredictionConfidence`, `UserSettings`,
-      `SymptomCatalog`.
+      `PhaseType`, `CyclePrediction`, `PhaseState`, `PredictionConfidence`, `CycleContext`,
+      `UserSettings`, `SymptomCatalog`.
 - [x] `domain/cycle/CycleCalculator.kt` — everything in §8.3 (`buildCycles`, `lengthsForStats`,
-      `robustMean`, `median`, `regularityOf`/`regularityLabel`, `averageCycleLength`,
-      `averagePeriodDuration`, `lutealPhaseLength`, `confidence`, `predict`, plus fertile window
-      and ovulation).
+      `robustMean`, `median`, `regularityOf`/`regularityLabel`, `outsideTypicalRange`/
+      `typicalityNote`, `averageCycleLength`, `averagePeriodDuration`, `lutealPhaseLength`,
+      `confidence`, `predict`, plus fertile window and ovulation).
 - [x] `domain/cycle/PredictionEngine.kt` — **folded into `CycleCalculator.kt`** (§4 deviation).
       Confidence rubric §8.5 implemented: `<3` LOW, `3–5` + stddev ≤3 MEDIUM, `≥6` + stddev ≤3 HIGH,
       stddev >7 downgrades one level.
 - [x] `domain/cycle/FertilityCalculator.kt` — **folded into `CycleCalculator.kt`** (§4 deviation).
-- [x] `domain/cycle/PhaseResolver.kt` — current phase for any date, with gap guard and ovulation
-      anchored to the *current* cycle (`endDate?.plusDays(1)`), falling back to the prediction.
-- [x] Unit tests covering **most** of §8.4 — 33 tests, 0 failing.
+- [x] `domain/cycle/PhaseResolver.kt` — current phase for any date, with gap guard, ovulation
+      anchored to the *current* cycle, and a `describeReadiness()` read that carries the same
+      typicality note as the regularity label.
+- [x] Unit tests covering **every** §8.4 edge case — 42 tests (31 + 11), 0 failing.
 
-**Still open (§8.4):**
-1. ⚠️ `outsideTypicalRange(cycles)` — soften confidence language for >35 or <21-day cycles.
-2. ❌ `CycleContext` flag (hormonal contraception / perimenopause / postpartum) — suppress or
-   heavily caveat predictions. Not started; touches `Models.UserSettings`, `SettingsRepository`,
-   and `CycleCalculator.predict`.
+**All §8.4 gaps closed.** See the per-item status above.
 
 **Acceptance:** Test suite demonstrates: defaults with 0 cycles; LOW confidence with 1 cycle;
 28-day cycles predicted correctly; stddev widening the prediction range; spotting excluded from
@@ -685,18 +707,21 @@ averages; phase resolution correct on day 1, last bleeding day, ovulation day, a
 
 ---
 
-### Phase 3 follow-up — spec gaps & hygiene
-**Effort:** ~0.5 day · **Do this on `phase-3-cycle-engine` branch before starting Phase 5**
+### Phase 3 follow-up — spec gaps & hygiene ✅ done (branch `phase-3-cycle-engine`)
+**Effort:** ~0.5 day · Was: do this before starting Phase 5
 
-- [ ] Add `CycleContext` enum (`NONE`, `HORMONAL_CONTRACEPTION`, `PERIMENOPAUSE`, `POSTPARTUM`) to
-      `UserSettings` with a DataStore-backed setter on `SettingsRepository`.
-- [ ] `CycleCalculator.predict(cycles, context)` returns `null` for `HORMONAL_CONTRACEPTION` and
-      sets `isCaveated = true` / forces `LOW` for the other non-default contexts.
-- [ ] Surface the caveat in `HomeScreen` copy and `PhaseVisuals` blurbs — never silently predict.
-- [ ] Add `outsideTypicalRange(cycles): Boolean` (true when the robust mean falls outside 21–35)
-      and force softened wording through `regularityLabel`.
-- [ ] Tests: contraception suppresses; perimenopause caveats; >35-day and <21-day histories soften.
-- [ ] Run `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest`, then commit → push → PR → merge.
+- [x] Add `CycleContext` enum (`NONE`, `HORMONAL_CONTRACEPTION`, `PERIMENOPAUSE`, `POSTPARTUM`) to
+      `UserSettings` with a DataStore-backed setter on `SettingsRepository`
+      (stored by enum name; unknown value falls back to `NONE` rather than throwing).
+- [x] `CycleCalculator.predict(cycles, context)` returns `null` for `HORMONAL_CONTRACEPTION` and
+      forces `isCaveated = true` / `LOW` confidence for the other non-default contexts.
+- [x] `ReminderWorker` passes `settings.cycleContext`, and never sends the date-claiming
+      period reminder on a caveated prediction.
+- [x] Add `outsideTypicalRange()` + `typicalityNote()` and push the softened wording through
+      `regularityLabel()` and `PhaseResolver.describeReadiness()`.
+- [x] Tests: 9 added covering contraception suppression, both caveats, long/short/typical ranges,
+      empty history, and label↔readiness agreement.
+- [x] Build + tests verified green, then committed → pushed → PR → merged.
 
 ---
 
@@ -752,6 +777,10 @@ a stale encrypted DB. ⚠️ **Untested** — requires a device.
       `SymptomLogDao` exist.
 - [ ] Optimistic UI updates; Snackbar undo for destructive actions.
 - [ ] Introduce `LocalAppContainer` (Phase 1 debt) so screens and previews can take a container.
+- [ ] **Surface `CycleContext` in the UI:** an onboarding/settings picker (none / hormonal
+      contraception / perimenopause / postpartum), and — when the context is caveated — copy on
+      the home card that says the dates are a rough guide. `predict()` already returns null or
+      `isCaveated = true`; nothing must present those dates as settled.
 
 **Acceptance:** A user can log a period from cold start in under 10 seconds; the home card updates
 immediately; all logged data survives process death.
@@ -997,25 +1026,20 @@ State these now so they do not creep in:
 
 ## 14. Where We Are & Next Actions
 
-**Position:** Phases 0–2 merged to `main` (`1e044c8`). Phase 3 and Phase 4 are code-complete with
-the gaps documented above. Build green, 33/33 tests pass.
+**Position:** Phases 0–3 merged to `main`, Phase 4 code-complete. Build green, **42/42 unit tests**.
 
 **Next, in order:**
 
-1. **Close the Phase 3 gaps** on branch `phase-3-cycle-engine` → commit → push → PR → merge:
-   - `CycleContext` (contraception / perimenopause / postpartum) threaded through `UserSettings`
-     and `SettingsRepository`; `predict()` suppresses or caveats accordingly.
-   - `outsideTypicalRange()` + softened copy for >35 / <21-day cycles.
-   - Tests for both, then `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest`.
-2. **Close the Phase 4 hygiene gaps** on branch `phase-4-persistence`:
+1. **Close the Phase 4 hygiene gaps** on branch `phase-4-persistence` → commit → push → PR → merge:
    - Add `.gitignore` entries for `google-services.json`, `*.jks`, `keystore.properties`, and switch
      to a single `/.idea/` rule (Phase 0 leftovers).
    - Turn on Room schema export and commit `app/schemas/` — must happen **before** any entity changes.
    - Write the `MigrationTestHelper` + reopen-in-new-process instrumentation tests under
      `androidTest/` (needs `androidx.room3:room3-testing`), even if they can only be *compiled*
      until a device is available (Q9).
-3. **Phase 5 — Logging Flow:** onboarding, real `HomeScreen`, period/symptom logging with undo,
-   `LocalAppContainer`, and wire `ReminderScheduler` to settings changes.
-4. Then Phase 6 (Calendar) → 7 (Insights) → 8 remainder → 9 → 10 → 11 → 12, in that order.
+2. **Phase 5 — Logging Flow:** onboarding (including the `CycleContext` picker), real `HomeScreen`
+   with caveat copy, period/symptom logging with undo, `LocalAppContainer`, and wire
+   `ReminderScheduler` to settings changes.
+3. Then Phase 6 (Calendar) → 7 (Insights) → 8 remainder → 9 → 10 → 11 → 12, in that order.
 
 **Branch/PR discipline:** one branch per phase, never push to `main`, commit messages **4–15 words**.

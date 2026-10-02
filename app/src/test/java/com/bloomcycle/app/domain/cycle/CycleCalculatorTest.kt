@@ -1,9 +1,11 @@
 package com.bloomcycle.app.domain.cycle
 
+import com.bloomcycle.app.domain.model.CycleContext
 import com.bloomcycle.app.domain.model.PeriodEvent
 import com.bloomcycle.app.domain.model.PredictionConfidence
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -271,6 +273,114 @@ class CycleCalculatorTest {
     fun `defaults are used until at least one real length exists`() {
         assertEquals(28, CycleCalculator.averageCycleLength(CycleCalculator.buildCycles(regularCycles(0))))
         assertEquals(PredictionConfidence.LOW, CycleCalculator.confidence(CycleCalculator.buildCycles(regularCycles(0))))
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Cycle context — plan.md 8.4 (contraception / perimenopause / postpartum)
+    // ---------------------------------------------------------------------------------------
+
+    @Test
+    fun `hormonal contraception suppresses the prediction instead of inventing one`() {
+        val cycles = CycleCalculator.buildCycles(regularCycles(6))
+        val prediction = CycleCalculator.predict(
+            cycles,
+            LocalDate.parse("2026-06-20"),
+            CycleContext.HORMONAL_CONTRACEPTION,
+        )
+        // Plenty of logged history, and still no prediction: ovulation is suppressed,
+        // so there is no cycle to read. Silence beats a confident fiction.
+        assertNull(prediction)
+    }
+
+    @Test
+    fun `a default context prediction is not caveated`() {
+        val prediction = assertNotNull(
+            CycleCalculator.predict(CycleCalculator.buildCycles(regularCycles(6)), LocalDate.parse("2026-06-20"))
+        )
+        assertEquals(CycleContext.NONE, prediction.context)
+        assertFalse(prediction.isCaveated)
+    }
+
+    @Test
+    fun `perimenopause predictions are caveated and pinned to low confidence`() {
+        val cycles = CycleCalculator.buildCycles(regularCycles(6))
+        // Six perfectly regular cycles would normally earn HIGH.
+        assertEquals(PredictionConfidence.HIGH, CycleCalculator.confidence(cycles))
+
+        val prediction = assertNotNull(
+            CycleCalculator.predict(cycles, LocalDate.parse("2026-06-20"), CycleContext.PERIMENOPAUSE)
+        )
+        assertTrue(prediction.isCaveated)
+        assertEquals(CycleContext.PERIMENOPAUSE, prediction.context)
+        assertEquals(PredictionConfidence.LOW, prediction.confidence)
+        // The dates themselves are still computed — the UI decides how to hedge them.
+        assertEquals(LocalDate.parse("2026-07-16"), prediction.nextPeriodStart)
+    }
+
+    @Test
+    fun `postpartum predictions are caveated too`() {
+        val prediction = assertNotNull(
+            CycleCalculator.predict(
+                CycleCalculator.buildCycles(regularCycles(6)),
+                LocalDate.parse("2026-06-20"),
+                CycleContext.POSTPARTUM,
+            )
+        )
+        assertTrue(prediction.isCaveated)
+        assertEquals(PredictionConfidence.LOW, prediction.confidence)
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Outside the typical range — plan.md 8.4 (long / short cycles still soften the copy)
+    // ---------------------------------------------------------------------------------------
+
+    @Test
+    fun `a consistently long cycle is still computed but says so in the label`() {
+        val cycles = CycleCalculator.buildCycles(regularCycles(6, length = 40))
+        assertEquals(40, CycleCalculator.averageCycleLength(cycles))
+        assertTrue(CycleCalculator.outsideTypicalRange(cycles))
+        // The wording softens; the number and the confidence do not.
+        assertEquals(PredictionConfidence.HIGH, CycleCalculator.confidence(cycles))
+        val label = CycleCalculator.regularityLabel(cycles)
+        assertTrue(label, label.startsWith("Very consistent"))
+        assertTrue(label, label.contains("longer than typical"))
+        assertTrue(label, label.contains("40 days"))
+    }
+
+    @Test
+    fun `a consistently short cycle is flagged as shorter than typical`() {
+        val cycles = CycleCalculator.buildCycles(regularCycles(6, length = 18))
+        assertEquals(18, CycleCalculator.averageCycleLength(cycles))
+        assertTrue(CycleCalculator.outsideTypicalRange(cycles))
+        val label = CycleCalculator.regularityLabel(cycles)
+        assertTrue(label, label.contains("shorter than typical"))
+    }
+
+    @Test
+    fun `a typical cycle is computed and never flagged`() {
+        val cycles = CycleCalculator.buildCycles(regularCycles(6, length = 28))
+        assertFalse(CycleCalculator.outsideTypicalRange(cycles))
+        assertEquals("Very consistent", CycleCalculator.regularityLabel(cycles))
+    }
+
+    @Test
+    fun `nothing is flagged when there is no history to judge`() {
+        val none = CycleCalculator.buildCycles(emptyList())
+        assertFalse(CycleCalculator.outsideTypicalRange(none))
+        assertFalse(CycleCalculator.outsideTypicalRange(emptyList()))
+        assertNull(CycleCalculator.typicalityNote(emptyList()))
+        assertEquals("Not enough history yet", CycleCalculator.regularityLabel(none))
+    }
+
+    @Test
+    fun `the readiness read carries the same note as the regularity label`() {
+        val longCycles = CycleCalculator.buildCycles(regularCycles(6, length = 40))
+        val ready = PhaseResolver.describeReadiness(longCycles)
+        assertTrue(ready, ready.contains("40 days"))
+        assertTrue(ready, ready.contains("longer than typical"))
+
+        val typical = PhaseResolver.describeReadiness(CycleCalculator.buildCycles(regularCycles(6)))
+        assertEquals("Your rhythm looks consistent", typical)
     }
 
     private fun <T> assertNotNull(value: T?): T {

@@ -23,6 +23,39 @@ enum class PredictionConfidence(val label: String) {
     HIGH("Based on a consistent pattern"),
 }
 
+/**
+ * Physiological context that changes whether a cycle prediction means anything at all.
+ *
+ * Every prediction assumes ovulation happens roughly a fortnight before the next bleed.
+ * Hormonal contraception suppresses ovulation outright, and perimenopause and the
+ * postpartum period both make cycles genuinely unpredictable — so in those states a
+ * confident-looking date is not a reading of the logged data, it is an invention.
+ * See plan.md §8.4.
+ */
+enum class CycleContext(val label: String, val blurb: String) {
+    NONE(
+        label = "Not applicable",
+        blurb = "Dates are read straight from what you have logged.",
+    ),
+    HORMONAL_CONTRACEPTION(
+        label = "Hormonal contraception",
+        blurb = "The combined pill, patch, ring, hormonal IUD, implant and injection suppress " +
+            "ovulation, so there is no cycle to predict. Bleeding on these is a withdrawal " +
+            "bleed, not a period.",
+    ),
+    PERIMENOPAUSE(
+        label = "Perimenopause",
+        blurb = "Cycles often lengthen, shorten or skip entirely, so any dates here are a " +
+            "rough guide at best.",
+    ),
+    POSTPARTUM(
+        label = "Postpartum or breastfeeding",
+        blurb = "Cycles are usually irregular while your body recovers, and may not have " +
+            "returned yet.",
+    ),
+}
+
+
 enum class SymptomCategory(val label: String) {
     FLOW("Flow"),
     PAIN("Sensations"),
@@ -90,7 +123,12 @@ data class CyclePrediction(
     val regularityLabel: String,
     val isLate: Boolean,
     val daysUntilNextPeriod: Long,
+    /** Why the dates below are caveated; [CycleContext.NONE] when they are not. */
+    val context: CycleContext = CycleContext.NONE,
 ) {
+    /** True when the user's context makes these dates a rough guide rather than a reading. */
+    val isCaveated: Boolean get() = context != CycleContext.NONE
+
     /** README's "long term prediction" — projected starts for the coming months. */
     fun projectNext(months: Int, cycleLength: Int = averageCycleLength): List<CycleDate> =
         (1..months).map { nextPeriodStart.plusDays((it * cycleLength).toLong()) }
@@ -134,8 +172,14 @@ data class UserSettings(
     val reminderHour: Int = 9,
     val reminderMinute: Int = 0,
     val dailyNoteEnabled: Boolean = true,
-    /** Set when the user tells us predictions should be quiet (contraception, TTC, etc.). */
+    /** Set when the user tells us notifications should be quiet (contraception, TTC, etc.). */
     val predictionsMuted: Boolean = false,
+    /**
+     * What is physiologically going on, from the user's side. Drives whether predictions
+     * are shown at all — see [CycleContext]. Independent of [predictionsMuted], which only
+     * silences notifications: this one changes what the engine is willing to claim.
+     */
+    val cycleContext: CycleContext = CycleContext.NONE,
     val chatDisplayName: String = "",
     val notificationPermissionAsked: Boolean = false,
 )

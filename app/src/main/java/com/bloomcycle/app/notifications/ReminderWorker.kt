@@ -28,11 +28,16 @@ class ReminderWorker(
 
         val today = container.cycleClock.today()
         val cycles = CycleCalculator.buildCycles(container.cycleRepository.periods())
-        val prediction = CycleCalculator.predict(cycles, today)
+        // HORMONAL_CONTRACEPTION yields null — nothing to remind about when there is no cycle.
+        val prediction = CycleCalculator.predict(cycles, today, settings.cycleContext)
 
         if (prediction != null && !settings.predictionsMuted) {
             val daysUntil = prediction.daysUntilNextPeriod
-            if (daysUntil in 0..2) {
+
+            // A caveated context (perimenopause, postpartum) must never claim a due date:
+            // "your period may be close" on a low-confidence estimate is exactly the
+            // overreach plan.md §8.4 exists to prevent. The check-in carries no date.
+            if (!prediction.isCaveated && daysUntil in 0..2) {
                 BloomNotifications.showPeriodReminder(
                     applicationContext,
                     applicationContext.getString(R.string.notification_period_title),
