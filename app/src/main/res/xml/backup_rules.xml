@@ -1,13 +1,19 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Bloom keeps cycle data in an SQLCipher-encrypted database whose key lives in
+  the Android Keystore. Keystore keys are non-exportable: a backup of the
+  database file restored onto another device (or after a factory reset) can
+  never be opened again, which is indistinguishable from data loss.
+
+  So we exclude ALL local storage from backup and device-to-device transfer.
+  Deliberately not backed up, and we would rather say so than silently lose
+  someone's period history.
+
+  Pre-Android 12 devices read backup_rules.xml instead of data_extraction_rules.xml.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="root" path="." />
 </full-backup-content>

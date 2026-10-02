@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Simple petal mark used for notification icons (must be monochrome). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2C9.5,4.2 8.4,6.8 8.7,9.4C9,11.6 10.3,13.4 12,14.6C13.7,13.4 15,11.6 15.3,9.4C15.6,6.8 14.5,4.2 12,2Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,14.6C10.1,15.6 8.9,17.3 8.9,19.2C8.9,20.7 9.7,22 12,22C14.3,22 15.1,20.7 15.1,19.2C15.1,17.3 13.9,15.6 12,14.6Z" />
+</vector>

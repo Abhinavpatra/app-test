@@ -1,0 +1,45 @@
+package com.bloomcycle.app
+
+import android.content.Context
+import com.bloomcycle.app.core.time.CycleClock
+import com.bloomcycle.app.core.time.SystemCycleClock
+import com.bloomcycle.app.data.crypto.PassphraseProvider
+import com.bloomcycle.app.data.local.DatabaseFactory
+import com.bloomcycle.app.data.repo.ChatRepositoryImpl
+import com.bloomcycle.app.data.repo.ContentRepositoryImpl
+import com.bloomcycle.app.data.repo.CycleRepositoryImpl
+import com.bloomcycle.app.data.repo.EntitlementRepositoryImpl
+import com.bloomcycle.app.data.repo.SettingsRepositoryImpl
+import com.bloomcycle.app.notifications.ReminderScheduler
+
+/**
+ * Hand-rolled dependency container.
+ *
+ * Deliberately not Hilt: Hilt 2.59 cannot read Kotlin 2.4 metadata, so adopting it would
+ * pin this project to an end-of-life compiler (plan.md §5.2). For a single module with
+ * this many dependencies, ~40 lines of explicit wiring is cheaper than that version
+ * matrix. Revisit only if the project splits into Gradle modules.
+ */
+class AppContainer(context: Context) {
+
+    private val appContext = context.applicationContext
+
+    val cycleClock: CycleClock = SystemCycleClock()
+
+    val passphraseProvider: PassphraseProvider by lazy { PassphraseProvider(appContext) }
+    val database by lazy { DatabaseFactory(appContext, passphraseProvider).create() }
+
+    val settings: SettingsRepositoryImpl by lazy { SettingsRepositoryImpl(appContext) }
+    val entitlements: EntitlementRepositoryImpl by lazy { EntitlementRepositoryImpl(appContext) }
+
+    val cycleRepository: CycleRepositoryImpl by lazy {
+        CycleRepositoryImpl(database.periodEventDao(), database.symptomLogDao(), cycleClock)
+    }
+
+    val chatRepository: ChatRepositoryImpl by lazy {
+        ChatRepositoryImpl(database.chatMessageDao(), cycleClock)
+    }
+
+    val contentRepository: ContentRepositoryImpl by lazy { ContentRepositoryImpl() }
+    val reminderScheduler: ReminderScheduler by lazy { ReminderScheduler(appContext) }
+}

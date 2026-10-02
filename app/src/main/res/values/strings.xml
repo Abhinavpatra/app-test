@@ -1,3 +1,16 @@
 <resources>
-    <string name="app_name">My Application</string>
+    <string name="app_name">Bloom</string>
+
+    <string name="notification_channel_period_title">Period reminders</string>
+    <string name="notification_channel_period_desc">A gentle heads-up when your period is likely to arrive.</string>
+    <string name="notification_channel_tips_title">Daily notes</string>
+    <string name="notification_channel_tips_desc">Small, kind suggestions for wherever you are in your cycle.</string>
+
+    <string name="notification_period_title">Your period may be close</string>
+    <string name="notification_period_body">Sometime around today or tomorrow — how are you feeling?</string>
+    <string name="notification_checkin_title">A moment for you</string>
+    <string name="notification_checkin_body">Log how your day is going when you have a second.</string>
+
+    <string name="disclaimer_entertainment">For reflection and entertainment — not medical guidance.</string>
+    <string name="disclaimer_health">Bloom is not a medical device. Predictions are estimates, not certainty.</string>
 </resources>
