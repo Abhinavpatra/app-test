@@ -2,6 +2,14 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.room3)
+}
+
+// Exports the schema JSON next to the code that owns it. Without this there is no
+// baseline to migrate from, so any future entity change is an untested destructive
+// migration (plan.md §6.3).
+room3 {
+    schemaDirectory("$projectDir/schemas")
 }
 
 android {
@@ -43,6 +51,21 @@ android {
 dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
+    // room3-migration's generated serializers rely on typeParametersSerializers() being a
+    // default method, which it only became in kotlinx-serialization 1.8. Something in the
+    // graph pulls 1.7.3 in and pins it, and at 1.7.3 MigrationTestHelper dies with
+    // AbstractMethodError the moment it deserializes the schema JSON.
+    constraints {
+        listOf("implementation", "testImplementation", "androidTestImplementation").forEach { cfg ->
+            add(cfg, "org.jetbrains.kotlinx:kotlinx-serialization-core") {
+                version { strictly(libs.versions.kotlinxSerialization.get()) }
+            }
+            add(cfg, "org.jetbrains.kotlinx:kotlinx-serialization-json") {
+                version { strictly(libs.versions.kotlinxSerialization.get()) }
+            }
+        }
+    }
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
@@ -71,6 +94,8 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room3.testing)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
