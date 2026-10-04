@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
@@ -51,6 +52,7 @@ import com.bloomcycle.app.domain.model.PeriodEvent
 import com.bloomcycle.app.domain.model.SymptomCatalog
 import com.bloomcycle.app.domain.model.SymptomLog
 import com.bloomcycle.app.domain.model.UserSettings
+import com.bloomcycle.app.ui.PageScrollSound
 import com.bloomcycle.app.ui.components.EmptyState
 import com.bloomcycle.app.ui.components.Gap
 import com.bloomcycle.app.ui.components.Hairline
@@ -77,6 +79,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
     val container = rememberAppContainer()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val listState = rememberLazyListState()
     val today = remember(container) { container.cycleClock.today() }
 
     var settings by remember { mutableStateOf<UserSettings?>(null) }
@@ -162,7 +165,9 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             return@Scaffold
         }
 
+        PageScrollSound(listState)
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),

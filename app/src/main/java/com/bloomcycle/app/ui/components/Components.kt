@@ -1,6 +1,11 @@
 package com.bloomcycle.app.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -19,8 +24,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -29,6 +37,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloomcycle.app.domain.model.PhaseType
 import com.bloomcycle.app.ui.phase.PhaseVisual
+import com.bloomcycle.app.ui.theme.BloomMotion
 import com.bloomcycle.app.ui.theme.Bloom
 import com.bloomcycle.app.ui.theme.EyebrowStyle
 import com.bloomcycle.app.ui.theme.Spacing
@@ -135,6 +144,11 @@ fun PhaseChip(
 
 // --- PrimaryButton ----------------------------------------------------------------------
 
+/**
+ * The app's two buttons share one press treatment: the ripple Material gives us for free,
+ * plus a small squeeze so the press registers even on a screen where the ripple is clipped
+ * by a corner. Height and inner padding come from the same numbers on both.
+ */
 @Composable
 fun PrimaryButton(
     text: String,
@@ -142,13 +156,18 @@ fun PrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val scale = pressScale(interactionSource, enabled)
     Button(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = 52.dp),
+        interactionSource = interactionSource,
+        modifier = modifier
+            .defaultMinSize(minHeight = ButtonHeight)
+            .graphicsLayer { scaleX = scale; scaleY = scale },
         enabled = enabled,
         shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(),
-        contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.xs),
+        contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
     ) {
         Text(text = text, style = MaterialTheme.typography.titleMedium)
     }
@@ -162,16 +181,37 @@ fun SecondaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val scale = pressScale(interactionSource, enabled)
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = 52.dp),
+        interactionSource = interactionSource,
+        modifier = modifier
+            .defaultMinSize(minHeight = ButtonHeight)
+            .graphicsLayer { scaleX = scale; scaleY = scale },
         enabled = enabled,
         shape = MaterialTheme.shapes.medium,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.xs),
+        contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
     ) {
         Text(text, style = MaterialTheme.typography.titleMedium)
     }
+}
+
+private val ButtonHeight = 56.dp
+
+@Composable
+private fun pressScale(
+    interactionSource: InteractionSource,
+    enabled: Boolean,
+): Float {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val target = if (pressed && enabled) 0.97f else 1f
+    return animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(durationMillis = BloomMotion.Default.durationQuick),
+        label = "buttonPress",
+    ).value
 }
 
 // --- SectionHeader ----------------------------------------------------------------------

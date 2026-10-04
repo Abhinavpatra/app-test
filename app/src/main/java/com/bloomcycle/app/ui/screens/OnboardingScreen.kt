@@ -7,8 +7,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DatePicker
@@ -130,7 +136,13 @@ fun OnboardingScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
-            Column(Modifier.fillMaxWidth()) {
+            // Scaffold measures the top bar as-is, so the status bar has to be padded here or
+            // the step counter and progress line land underneath the clock.
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars.only(WindowInsetsSides.Top)),
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -166,6 +178,10 @@ fun OnboardingScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        // The bar itself draws behind the gesture bar; only its content is inset.
+                        .windowInsetsPadding(
+                            WindowInsets.navigationBars.only(WindowInsetsSides.Bottom),
+                        )
                         .padding(Spacing.screen),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
