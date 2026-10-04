@@ -16,6 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -153,6 +154,26 @@ fun PrimaryButton(
     }
 }
 
+/** The quiet counterpart to [PrimaryButton] — same height, so pairing them in a row lines up. */
+@Composable
+fun SecondaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.defaultMinSize(minHeight = 52.dp),
+        enabled = enabled,
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.xs),
+    ) {
+        Text(text, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
 // --- SectionHeader ----------------------------------------------------------------------
 
 @Composable
@@ -247,4 +268,58 @@ fun Hairline(modifier: Modifier = Modifier) {
 @Composable
 fun Gap(size: Dp = Spacing.md) {
     Spacer(Modifier.height(size))
+}
+
+// --- CycleContextRow --------------------------------------------------------------------
+
+/**
+ * The picker for [com.bloomcycle.app.domain.model.CycleContext] — onboarding and settings
+ * ask the same question, so they share the row rather than drifting apart.
+ *
+ * Colour never carries the choice alone: the row shows a radio, the label and, when
+ * selected, the one line that says what picking it changes.
+ */
+@Composable
+fun CycleContextRow(
+    option: com.bloomcycle.app.domain.model.CycleContext,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onSelect,
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = if (selected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        border = BorderStroke(
+            1.dp,
+            if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.outlineVariant
+            },
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(Spacing.sm),
+            verticalAlignment = Alignment.Top,
+        ) {
+            androidx.compose.material3.RadioButton(selected = selected, onClick = onSelect)
+            Column {
+                Text(option.label, style = MaterialTheme.typography.titleMedium)
+                if (selected) {
+                    Gap(Spacing.xxxs)
+                    Text(
+                        text = option.blurb,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
 }

@@ -166,6 +166,14 @@ data class ContentItem(
     val isPremium: Boolean = false,
 )
 
+/**
+ * Bounds for the "typical cycle length" setting. Deliberately wider than the clinical
+ * typical band (`CycleCalculator.TYPICAL_MIN..TYPICAL_MAX`): this field is what the user
+ * says is normal *for them*, and 40-day cycles are common enough to be worth entering.
+ */
+const val TYPICAL_CYCLE_MIN = 21
+const val TYPICAL_CYCLE_MAX = 45
+
 data class UserSettings(
     val onboardingComplete: Boolean = false,
     val remindersEnabled: Boolean = true,
@@ -182,6 +190,13 @@ data class UserSettings(
     val cycleContext: CycleContext = CycleContext.NONE,
     val chatDisplayName: String = "",
     val notificationPermissionAsked: Boolean = false,
+    /** Asked once in onboarding; nullable because it is genuinely optional. */
+    val birthDate: CycleDate? = null,
+    /**
+     * What the user says a usual cycle runs for. The engine only consults it when there is
+     * not enough logged history to measure one — logged data always wins.
+     */
+    val typicalCycleLength: Int = 28,
 )
 
 enum class PremiumFeature(val title: String, val blurb: String) {

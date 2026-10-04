@@ -1,16 +1,17 @@
 # Implementation Plan — Period Tracking App ("Bloom")
 
-Status: **in progress.** Phases 0–4 done and merged (Phase 4 verified on device: schema export on,
-4 instrumentation tests green). Phases 5–12 not started.
-Last reviewed: 2026-10-02
+Status: **in progress.** Phases 0–5 done and merged (Phase 5 verified on device: onboarding, period and
+symptom logging, home card, settings, reminder wiring; 57 unit + 4 instrumentation tests green).
+Phases 6–12 not started.
+Last reviewed: 2026-10-04
 Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 
 **Working agreement (user directive):** one branch per phase → commit with a **4–15 word** message →
 push → open PR with `gh` → merge into `main` → delete the branch. Never push directly to `main`.
 
 **Verified green:**
-- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **42/42 unit tests**
-  (CycleCalculator 31, PhaseResolver 11).
+- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **57/57 unit tests**
+  (CycleCalculator 31, PhaseResolver 11, HomeSummary 8, PeriodEntryRules 7).
 - `.\gradlew.bat :app:connectedDebugAndroidTest` on emulator `Pixel_9` → **4/4 instrumentation tests**
   (plaintext-canary, fresh reopen, schema create, live-schema-vs-JSON).
 
@@ -30,8 +31,10 @@ Recommended sequencing, in priority order (phase numbers match §10):
 3. ✅ **Encrypted local persistence** (Phase 4). Done — SQLCipher + Keystore + backup excludes,
    schema export, and 4 on-device instrumentation tests (including a real `PassphraseProvider` bug
    the reopen test caught).
-4. **Calendar + logging** (Phases 5–6). The minimum viable loop: user logs a period, sees it on a calendar.
-5. Everything else in the README is layered on top of that loop.
+4. ✅ **Logging flow** (Phase 5). Done — onboarding, Today card, period/symptom sheets, settings,
+   reminder scheduling. The minimum viable loop: user logs a period and sees it on the home card.
+5. **Calendar + insights** (Phases 6–7). The rest of the loop: logged periods on a calendar, charts.
+6. Everything else in the README is layered on top of that loop.
 
 Estimated solo build: **6–8 weeks** to a shippable v1 covering all README features except real
 payments and live chat.
@@ -40,27 +43,28 @@ payments and live chat.
 
 ## 2. Current State — What Actually Exists
 
-The template is gone. This is now a real codebase: **44 Kotlin source files (40 main, 2 unit test,
-2 instrumentation), 42 passing unit tests + 4 passing on-device tests, a Fraunces/Karla type system,
+The template is gone. This is now a real codebase: **54 Kotlin source files (48 main, 4 unit test,
+2 instrumentation), 57 passing unit tests + 4 passing on-device tests, a Fraunces/Karla type system,
 and one merged PR per completed phase.**
 
-### Done (Phases 0–4)
+### Done (Phases 0–5)
 
 | Area | Files |
 |---|---|
-| App class / DI | `BloomApplication.kt`, `AppContainer.kt` (hand-rolled, no Hilt) |
+| App class / DI | `BloomApplication.kt`, `AppContainer.kt` (hand-rolled, no Hilt), `ui/AppContainer.kt` (`LocalAppContainer`) |
 | Time | `core/time/CycleDate.kt` — `typealias CycleDate = LocalDate`, `CycleClock` interface, `SystemCycleClock` |
 | Domain models | `domain/model/Models.kt`, `domain/model/SymptomCatalog.kt` |
 | Cycle engine | `domain/cycle/CycleCalculator.kt`, `domain/cycle/PhaseResolver.kt` |
+| Domain logic | `domain/home/HomeSummary.kt` (Today card), `domain/validation/PeriodEntryRules.kt` |
 | Repositories | `domain/repository/Repositories.kt` + `data/repo/{Cycle,Settings,Entitlement,Chat,Content}RepositoryImpl.kt` |
 | Content | `domain/content/ContentLibrary.kt` — ~15 curated, cited items |
 | Persistence | `data/local/{Entities,Daos,Converters,AppDatabase,DatabaseFactory}.kt`, `data/crypto/PassphraseProvider.kt` |
 | Notifications | `notifications/{BloomNotifications,ReminderWorker,ReminderScheduler}.kt` + `res/drawable/ic_stat_bloom.xml` |
 | Theme | `ui/theme/{Color,Type,Shape,Motion,Spacing,Theme}.kt` + 7 `res/font/*.ttf` |
 | Shell | `ui/BloomApp.kt`, `ui/navigation/BloomDestination.kt`, `ui/phase/PhaseVisuals.kt` |
-| Components | `ui/components/{Components,Placeholder}.kt` |
-| Screens | `ui/screens/{Home,Calendar,Insights,Chat,Settings}Screen.kt` (logged-out placeholders) |
-| Tests | `src/test/.../CycleCalculatorTest.kt` (31), `PhaseResolverTest.kt` (11) |
+| Components | `ui/components/{Components,Placeholder,DateField}.kt`, `ui/format/DateText.kt` |
+| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet}.kt` real; `{Calendar,Insights,Chat}Screen.kt` placeholders |
+| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),HomeSummaryTest(8),PeriodEntryRulesTest(7)}.kt` |
 | Instrumentation | `src/androidTest/.../{DatabasePersistenceTest,MigrationSchemaTest}.kt` (4) |
 | Schema baseline | `app/schemas/com.bloomcycle.app.data.local.AppDatabase/1.json` |
 
@@ -80,24 +84,26 @@ One branch → PR → merge per phase, never a direct push to `main`. Pattern:
 | 2 app shell | `phase-2-app-shell` | #2 ✅ |
 | 3 cycle engine | `phase-3-cycle-engine` | #3 ✅ |
 | 4 persistence | `phase-4-persistence` | #4 ✅ |
+| 5 logging flow | `phase-5-logging-flow` | #5 ✅ |
 
 `origin` = `https://github.com/Abhinavpatra/app-test.git`, `gh` v2.69.0 authenticated as
 `Abhinavpatra`. Run `git log --oneline -10` for the live list.
 
 ### Known gaps (tracked per phase in §10)
 
-- **No Phase 5+ UI** — all five screens are honest empty placeholders, including the
-  `CycleContext` picker (the domain flag exists and is persisted; nothing lets a user set it yet).
-- **Nothing schedules `ReminderScheduler`** — no settings toggle, no log action, no boot receiver.
-- **No `LocalAppContainer`** — `BloomApplication.container` is a plain property; Compose previews
-  and tests cannot substitute a container. Phase 5 debt.
+- **Calendar, Insights and Chat are still placeholders** — Home, Settings, Onboarding and both log
+  sheets are real (Phase 5); the other three land in Phases 6, 7 and 11.
+- **Nothing schedules `ReminderScheduler` on boot or timezone change** — settings, onboarding and log
+  actions now reschedule through `BloomApp`, but there is no `BOOT_COMPLETED` receiver (Phase 8).
 - **Firebase still blocked** — no `google-services.json`; `BuildConfig.FIREBASE_CHAT = false` (Q10).
 
-### Fixed this phase (Phase 4)
+### Fixed this phase (Phase 5)
 
-- `app/schemas/` now exists (`exportSchema = true`, `room3 { schemaDirectory(...) }`).
-- `.gitignore` covers `.idea/`, `*.jks`, `*.keystore`, `keystore.properties`, `google-services.json`.
-- 4 instrumentation tests exist and pass on an emulator (Q9 resolved).
+- Onboarding, `HomeScreen`, period/symptom sheets and a real `SettingsScreen` replaced the
+  placeholders; `LocalAppContainer` composition local is in (`ui/AppContainer.kt`).
+- `BloomApp` is the single caller of `ReminderScheduler`, reacting to `remindersEnabled` / hour / minute.
+- Pure domain additions with tests: `HomeSummarizer` (Today card copy) and `PeriodEntryRules`
+  (log-sheet validation, including overlap and self-edit cases).
 
 ---
 
@@ -159,12 +165,15 @@ com.bloomcycle.app/
 │   ├── theme/                     ✅ Color, Type, Shape, Motion, Spacing, Theme   (= planned core/design/)
 │   ├── navigation/                ✅ BloomDestination.kt
 │   ├── phase/                     ✅ PhaseVisuals.kt
-│   ├── components/                ✅ Components.kt, Placeholder.kt
-│   ├── screens/                   ✅ Home, Calendar, Insights, Chat, Settings (placeholders)
-│   └── BloomApp.kt                ✅ NavigationSuiteScaffold + NavHost
+│   ├── components/                ✅ Components.kt, Placeholder.kt, DateField.kt
+│   ├── format/                     ✅ DateText.kt (date copy + picker conversion)
+│   ├── screens/                   ✅ Home, Settings, Onboarding, PeriodLogSheet, SymptomLogSheet
+│   │                               ⏳ Calendar, Insights, Chat (placeholders)
+│   ├── AppContainer.kt             ✅ LocalAppContainer + rememberAppContainer()
+│   └── BloomApp.kt                ✅ NavHost, onboarding gate, reminder scheduling
 │
-└── feature/                       ⏳ — onboarding, real calendar, charts, tips,
-                                         paywall, settings detail: all planned, none written
+└── feature/                       ⏳ — real calendar, charts, tips,
+                                         paywall detail: all planned, none written
 ```
 
 **Layering rule:** `ui/` → `domain/` interfaces ← `data/` implementations. No `data/` type
@@ -657,18 +666,17 @@ shows in the launcher. ✅ Met.
 - [x] **Enable schema export** — `room3 { schemaDirectory(...) }` + `exportSchema = true`. ✅ Phase 4
       (§6.3); the plugin is `androidx.room3`, not `androidx.room`.
 - [x] Create `BloomApplication` + `AppContainer`.
-      ⚠️ **Deviation:** no `LocalAppContainer` composition local. The container is exposed as
-      `BloomApplication.container` (a plain property) and pulled in where needed. Fine for now, but
-      a `LocalAppContainer` should be introduced alongside Phase 5's real screens — Compose
-      previews and tests cannot substitute a container without one.
+      ✅ `LocalAppContainer` composition local added in Phase 5 (`ui/AppContainer.kt`), reached with
+      `rememberAppContainer()`; production falls back to `BloomApplication.container`, so tests and
+      previews can inject a stub.
 - [x] Create `core/time/`:
   - `typealias CycleDate = LocalDate` ✅
   - `interface CycleClock { fun today(): CycleDate; fun now(): Instant }` ✅ + `SystemCycleClock`,
     injected into `CycleRepositoryImpl`, `ChatRepositoryImpl`, `ReminderWorker`.
 - [x] Enable `buildConfig`; `FIREBASE_CHAT = false` (no API secrets hardcoded).
 - [x] Add `Turbine` + `kotlinx-coroutines-test` to `testImplementation`.
-      ⚠️ Declared but **not yet used by any test** — all 33 tests are synchronous JUnit. Reach for
-      them when `SettingsRepository` (Flow) gets its first test in Phase 5.
+      ⚠️ Declared but **not yet used by any test** — all 57 tests are synchronous JUnit. Reach for
+      them when `SettingsRepository` (Flow) gets its first test.
 
 **Acceptance:** App builds with all deps resolved; a unit test can inject a fixed `CycleClock` and
 assert on a date 40 days later. ⚠️ **Partly met** — build is green and `CycleClock` is injectable,
@@ -797,33 +805,39 @@ SUCCESSFUL, `tests="4" failures="0"`.
 
 ---
 
-### Phase 5 — Logging Flow ⬜ not started
+### Phase 5 — Logging Flow ✅ merged
 **Effort:** ~2 days
 
-> Pre-work already on `main`: `ui/screens/HomeScreen.kt` exists but renders `PlaceholderScreen`;
-> `notifications/{BloomNotifications,ReminderWorker,ReminderScheduler}.kt` are written and wired to
-> `BloomApplication.onCreate` (that is Phase 8 work landing early — the reminder itself has not been
-> scheduled on any settings change yet); `CycleClock` is injected into `CycleRepositoryImpl`.
+> Landed this phase: six-step onboarding, real `HomeScreen` with the Today card, period and symptom
+> sheets with snackbar undo, a real `SettingsScreen`, `LocalAppContainer`, and `BloomApp` as the one
+> caller of `ReminderScheduler` (settings and onboarding only write flags). Screens hold their own
+> settings/Room state with `LaunchedEffect` + `collectAsStateWithLifecycle` — no ViewModels, which
+> would be scaffolding without an extra job to do yet.
 
-- [ ] Onboarding: welcome, birth date, current cycle start, "typical cycle length" with soft
+- [x] Onboarding: welcome, birth date, current cycle start, "typical cycle length" with soft
       defaults, notification permission request.
-- [ ] `feature/home/` (in practice: flesh out `ui/screens/HomeScreen.kt`) — today's phase card,
-      cycle day, days to next predicted period. `PhaseVisuals` and `CycleCalculator`/`PhaseResolver`
-      already provide everything it needs.
-- [ ] Period logging: start / end / flow level / edit / delete, with validation and undo.
-      `PeriodEventDao` + `CycleRepositoryImpl` already support insert/update/delete and enforce a
-      unique `startDate`.
-- [ ] Symptom logging: multi-select from catalog + severity. `SymptomCatalog` and
-      `SymptomLogDao` exist.
-- [ ] Optimistic UI updates; Snackbar undo for destructive actions.
-- [ ] Introduce `LocalAppContainer` (Phase 1 debt) so screens and previews can take a container.
-- [ ] **Surface `CycleContext` in the UI:** an onboarding/settings picker (none / hormonal
+- [x] `feature/home/` (in practice: flesh out `ui/screens/HomeScreen.kt`) — today's phase card,
+      cycle day, days to next predicted period, via a new pure `HomeSummarizer`
+      (`domain/home/HomeSummary.kt`).
+- [x] Period logging: start / end / flow level / edit / delete, with validation and undo.
+      `PeriodEntryRules` holds the validation; snackbar undo restores a deleted event.
+- [x] Symptom logging: multi-select from catalog + severity (`SymptomLogSheet`).
+- [x] Optimistic UI updates; Snackbar undo for destructive actions.
+- [x] Introduce `LocalAppContainer` (Phase 1 debt) so screens and previews can take a container
+      (`ui/AppContainer.kt`).
+- [x] **Surface `CycleContext` in the UI:** onboarding step + settings picker (none / hormonal
       contraception / perimenopause / postpartum), and — when the context is caveated — copy on
       the home card that says the dates are a rough guide. `predict()` already returns null or
       `isCaveated = true`; nothing must present those dates as settled.
+- [x] Wire `ReminderScheduler`: `BloomApp` reacts to `remindersEnabled` / `reminderHour` /
+      `reminderMinute` and calls `ensureScheduled` or `cancel` — the only caller, so onboarding and
+      Settings only write flags.
+- [x] Unit tests for the two new pure pieces: `HomeSummaryTest` (8) + `PeriodEntryRulesTest` (7).
 
 **Acceptance:** A user can log a period from cold start in under 10 seconds; the home card updates
 immediately; all logged data survives process death.
+
+✅ **Done, merged as #5.** 57/57 unit tests + 4/4 instrumentation tests green; `assembleDebug` builds.
 
 ---
 
@@ -882,20 +896,21 @@ every chart has an accessible non-visual equivalent.
   - ✅ `PeriodicWorkRequestBuilder<ReminderWorker>(1, DAYS)` under unique work name
         `bloom.daily-reminder` — reads `container.cycleClock.today()`.
   - ✅ **Not** `AlarmManager.setExactAndAllowWhileIdle`, so no `SCHEDULE_EXACT_ALARM` permission.
-  - ❌ **Not yet rescheduled on every log, settings change, boot, and timezone change** —
-        `ReminderScheduler` is never called from a settings toggle or a logging action.
-        Wire this in Phase 5/6 where those actions live, and add a `BOOT_COMPLETED` receiver.
-- [ ] Runtime `POST_NOTIFICATIONS` permission on Android 13+, requested with context, never blocking.
-      ⚠️ Manifest permission is declared; the runtime request is not implemented
-      (`UserSettings.notificationPermissionAsked` exists as a stub).
+  - ✅ Rescheduled on settings change (Phase 5): `BloomApp` calls `ensureScheduled` /
+        `cancel` whenever `remindersEnabled`, `reminderHour` or `reminderMinute` changes, and
+        onboarding writes the same flags. Still missing: reschedule on every log, and a
+        `BOOT_COMPLETED` / timezone-change receiver (this phase).
+- [x] Runtime `POST_NOTIFICATIONS` permission on Android 13+, requested with context, never blocking.
+      ✅ Requested from onboarding and from the Settings toggle (Phase 5); the answer is recorded in
+      `UserSettings.notificationPermissionAsked`, so it is asked at most once.
 - [ ] Early-signals nudges during predicted PMS/luteal window. Not started.
 - [ ] Long-term (6-month) projection → **Premium**. `CyclePrediction.projectNext(months)` already
       exists; only the `PremiumGate` around it is missing (Phase 9).
 
 **Acceptance:** A reminder fires within a minute of its scheduled time in a manual test; disabling
 notifications actually silences it; changing the device timezone reschedules correctly.
-⚠️ **Untested** — the enable/disable path is not wired (and nothing calls `ReminderScheduler` yet).
-An emulator is available for the manual test when Phase 8 lands (Q9).
+⚠️ **Partly wired, still untested** — the settings enable/disable path is wired (Phase 5) but no
+manual firing test has been run. An emulator is available for the manual test when Phase 8 lands (Q9).
 
 ---
 
@@ -1067,16 +1082,14 @@ State these now so they do not creep in:
 
 ## 14. Where We Are & Next Actions
 
-**Position:** Phases 0–4 merged to `main`. Build green, **42/42 unit tests + 4/4 instrumentation
+**Position:** Phases 0–5 merged to `main`. Build green, **57/57 unit tests + 4/4 instrumentation
 tests**, schema baseline committed, installable APK at
 `app\build\outputs\apk\debug\app-debug.apk` (see `README.md`).
 
 **Next, in order:**
 
-1. **Phase 5 — Logging Flow:** onboarding (including the `CycleContext` picker), real `HomeScreen`
-   with caveat copy, period/symptom logging with undo, `LocalAppContainer` (Phase 1 debt), and wire
-   `ReminderScheduler` to settings changes.
-2. Then Phase 6 (Calendar) → 7 (Insights) → 8 remainder → 9 → 10 → 11 → 12, in that order.
+1. **Phase 6 — Calendar:** put logged periods on a calendar, day-tap logging, month navigation.
+2. Then 7 (Insights) → 8 remainder → 9 → 10 → 11 → 12, in that order.
 3. Still open across phases: `google-services.json` (Q10 → Phase 11), Phase 0's Firebase/AGP 9
    verification, and a review of `ContentLibrary.kt` citations (Q2 → Phase 12).
 
