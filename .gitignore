@@ -1,15 +1,24 @@
+# IDE state — never committed. Android Studio regenerates all of it locally.
+/.idea/
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
+
+# Build output
+.gradle/
+build/
 /captures
 .externalNativeBuild
 .cxx
+
+# Machine-specific SDK location
 local.properties
+
+# Signing material — never commit
+*.jks
+*.keystore
+keystore.properties
+
+# Firebase config — per-developer, gitignored by plan.md Phase 0 / §5.3
+google-services.json
+
+# OS
+.DS_Store

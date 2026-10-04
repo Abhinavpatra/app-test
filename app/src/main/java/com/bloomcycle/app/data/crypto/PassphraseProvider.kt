@@ -48,20 +48,23 @@ class PassphraseProvider(context: Context) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, wrappingKey())
         val iv = cipher.iv
+        check(iv.size == GCM_IV_BYTES) {
+            "Expected a $GCM_IV_BYTES-byte Keystore IV, got ${iv.size}"
+        }
+        // doFinal's output already carries the 16-byte GCM auth tag, so the envelope is
+        // simply IV || ciphertext — no tag accounting needed here or in unwrap.
         val ciphertext = cipher.doFinal(plain)
-        val combined = ByteArray(iv.size + ciphertext.size)
-        iv.copyInto(combined, 0)
-        ciphertext.copyInto(combined, iv.size)
-        return Base64.encodeToString(combined, Base64.NO_WRAP)
+        return Base64.encodeToString(iv + ciphertext, Base64.NO_WRAP)
     }
 
     private fun unwrap(encoded: String): ByteArray {
         val combined = Base64.decode(encoded, Base64.NO_WRAP)
-        // Android Keystore GCM uses a 12-byte IV; take it from the envelope rather than
-        // hardcoding so a future provider change cannot silently corrupt the payload.
-        val ivLength = combined.size - GCM_TAG_BITS / 8
-        val iv = combined.copyOfRange(0, ivLength)
-        val ciphertext = combined.copyOfRange(ivLength, combined.size)
+        // Envelope = IV || ciphertext. The IV length must be read as a fixed 12 bytes:
+        // deriving it as (size - tagLength) gives 44 here, because doFinal already
+        // includes the tag, and Android Keystore accepts nothing but a 12-byte IV.
+        require(combined.size > GCM_IV_BYTES) { "Malformed passphrase envelope" }
+        val iv = combined.copyOfRange(0, GCM_IV_BYTES)
+        val ciphertext = combined.copyOfRange(GCM_IV_BYTES, combined.size)
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.DECRYPT_MODE, wrappingKey(), GCMParameterSpec(GCM_TAG_BITS, iv))
         return cipher.doFinal(ciphertext)
@@ -102,5 +105,8 @@ class PassphraseProvider(context: Context) {
         const val PASSPHRASE_BYTES = 32
         const val KEY_SIZE_BITS = 256
         const val GCM_TAG_BITS = 128
+
+        /** Android Keystore only ever emits/accepts a 12-byte GCM IV. */
+        const val GCM_IV_BYTES = 12
     }
 }

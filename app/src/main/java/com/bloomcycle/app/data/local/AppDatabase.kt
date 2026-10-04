@@ -11,7 +11,7 @@ import androidx.room3.ColumnTypeConverters
         ChatMessageEntity::class,
     ],
     version = 1,
-    exportSchema = false,
+    exportSchema = true,
 )
 @ColumnTypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
