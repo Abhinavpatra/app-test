@@ -9,9 +9,13 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.bloomcycle.app.core.time.CycleDate
 import com.bloomcycle.app.domain.model.CycleContext
+import com.bloomcycle.app.domain.model.TYPICAL_CYCLE_MAX
+import com.bloomcycle.app.domain.model.TYPICAL_CYCLE_MIN
 import com.bloomcycle.app.domain.model.UserSettings
 import com.bloomcycle.app.domain.repository.SettingsRepository
+import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -29,6 +33,8 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
         val context = stringPreferencesKey("cycle_context")
         val chatName = stringPreferencesKey("chat_display_name")
         val permissionAsked = booleanPreferencesKey("notification_permission_asked")
+        val birthDate = stringPreferencesKey("birth_date")
+        val typicalLength = intPreferencesKey("typical_cycle_length")
     }
 
     override val settings: Flow<UserSettings> = context.settingsStore.data.map { p -> read(p) }
@@ -47,6 +53,8 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
         cycleContext = cycleContextOf(p[Keys.context]),
         chatDisplayName = p[Keys.chatName] ?: "",
         notificationPermissionAsked = p[Keys.permissionAsked] ?: false,
+        birthDate = p[Keys.birthDate]?.let(::birthDateOf),
+        typicalCycleLength = (p[Keys.typicalLength] ?: 28).coerceIn(TYPICAL_CYCLE_MIN, TYPICAL_CYCLE_MAX),
     )
 
     private fun write(p: MutablePreferences, s: UserSettings) {
@@ -59,7 +67,23 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
         p[Keys.context] = s.cycleContext.name
         p[Keys.chatName] = s.chatDisplayName
         p[Keys.permissionAsked] = s.notificationPermissionAsked
+        p[Keys.typicalLength] = s.typicalCycleLength.coerceIn(TYPICAL_CYCLE_MIN, TYPICAL_CYCLE_MAX)
+
+        // Nullable by design: a preference must never be written as the string "null".
+        val birthDate = s.birthDate
+        if (birthDate != null) {
+            p[Keys.birthDate] = birthDate.toString()
+        } else {
+            p.remove(Keys.birthDate)
+        }
     }
+
+    /**
+     * A corrupt or hand-edited date must not take the whole settings flow down with it —
+     * fall back to "not told us" instead of throwing.
+     */
+    private fun birthDateOf(raw: String): CycleDate? =
+        runCatching { LocalDate.parse(raw) }.getOrNull()
 
     /**
      * Stored by enum name so a future enum entry can be added without breaking reads.
