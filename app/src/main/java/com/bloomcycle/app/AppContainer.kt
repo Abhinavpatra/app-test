@@ -12,6 +12,7 @@ import com.bloomcycle.app.data.repo.ContentRepositoryImpl
 import com.bloomcycle.app.data.repo.CycleRepositoryImpl
 import com.bloomcycle.app.data.repo.EntitlementRepositoryImpl
 import com.bloomcycle.app.data.repo.SettingsRepositoryImpl
+import com.bloomcycle.app.domain.repository.ChatRepository
 import com.bloomcycle.app.domain.repository.EntitlementRepository
 import com.bloomcycle.app.notifications.ReminderScheduler
 import kotlinx.coroutines.flow.first
@@ -45,7 +46,12 @@ class AppContainer(context: Context) {
         CycleRepositoryImpl(database.periodEventDao(), database.symptomLogDao(), cycleClock)
     }
 
-    val chatRepository: ChatRepositoryImpl by lazy {
+    /**
+     * Declared as the interface, mirroring [entitlements]: the day `google-services.json`
+     * lands and `BuildConfig.FIREBASE_CHAT` flips, the Firestore implementation is chosen
+     * here and no screen changes (plan.md Phase 11).
+     */
+    val chatRepository: ChatRepository by lazy {
         ChatRepositoryImpl(database.chatMessageDao(), cycleClock)
     }
 

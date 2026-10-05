@@ -1,19 +1,23 @@
 # Implementation Plan — Period Tracking App ("Bloom")
 
 Status: **in progress.** Phases 0–10 merged to `main` (Phases 5–10 delivered logging, calendar,
-insights, the notification policy, the premium seam and the three analyses; **130 unit + 4
-instrumentation tests** green). Phases 11–12 not started.
-Last reviewed: 2026-10-05
+insights, the notification policy, the premium seam and the three analyses). Phase 11 is split:
+the **on-device half — chat rooms, pseudonyms, moderation, report/block — is merged as PR #13**,
+the Firebase half is blocked on `google-services.json` (Q10). **159 unit + 4 instrumentation tests**
+green. Phase 12 not started.
+Last reviewed: 2026-10-06
 Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 
 **Working agreement (user directive):** one branch per phase → commit with a **4–15 word** message →
 push → open PR with `gh` → merge into `main` → delete the branch. Never push directly to `main`.
 
 **Verified green:**
-- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **130/130 unit tests**
+- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **159/159 unit tests**
   (CycleCalculator 31, PhaseResolver 11, CalendarModel 17, ChartSeries 13, HomeSummary 8,
-  PeriodEntryRules 7, ReminderDecision 9, EntitlementState 6, Astrology 6, InsightsAnalysis 5,
-  FertilityReadout 5, WorkoutAdvisor 5, InclinationProfile 4, ReminderRescheduleReceiver 3).
+  ChatModerationPolicy 9, PeriodEntryRules 7, ReminderDecision 9, EntitlementState 6, Astrology 6,
+  ChatIdentityFactory 6, InsightsAnalysis 5, FertilityReadout 5, WorkoutAdvisor 5,
+  InclinationProfile 4, ChatReport 5, ChatVisibility 5, ChatRepositoryImpl 4,
+  ReminderRescheduleReceiver 3).
 - `.\gradlew.bat :app:connectedDebugAndroidTest` on emulator `Pixel_9` → **4/4 instrumentation tests**
   (plaintext-canary, fresh reopen, schema create, live-schema-vs-JSON).
 
@@ -40,7 +44,9 @@ Recommended sequencing, in priority order (phase numbers match §10):
    reminder decision (early-signal nudges, boot/timezone rescheduling), the six-month projection.
 7. ✅ **Entitlements & paywall** (Phase 9). The billing seam, the paywall screen, the debug unlock.
 8. ✅ **Premium analyses** (Phase 10). Fertility window, movement by phase, moon sign, inclinations.
-9. Everything else in the README is layered on top of that loop.
+9. ✅ **Chat rooms, on-device half** (Phase 11a). Pseudonyms, global + phase rooms, moderation,
+   report and block — waiting only on Firebase for the server side (11b, Q10).
+10. Everything else in the README is layered on top of that loop.
 
 Estimated solo build: **6–8 weeks** to a shippable v1 covering all README features except real
 payments and live chat.
@@ -49,8 +55,8 @@ payments and live chat.
 
 ## 2. Current State — What Actually Exists
 
-The template is gone. This is now a real codebase: **79 Kotlin source files (63 main, 14 unit test,
-2 instrumentation), 130 passing unit tests + 4 passing on-device tests, a Fraunces/Karla type system,
+The template is gone. This is now a real codebase: **88 Kotlin source files (67 main, 19 unit test,
+2 instrumentation), 159 passing unit tests + 4 passing on-device tests, a Fraunces/Karla type system,
 and one merged PR per completed phase.**
 
 ### Done (Phases 0–10)
@@ -71,8 +77,8 @@ and one merged PR per completed phase.**
 | Shell | `ui/BloomApp.kt`, `ui/navigation/BloomDestination.kt`, `ui/phase/PhaseVisuals.kt`, `ui/SoundEffects.kt` |
 | Components | `ui/components/{Components,Placeholder,DateField,PremiumGate}.kt`, `ui/format/DateText.kt` |
 | Charts | `ui/charts/Charts.kt` — cycle-length line, period-duration bars, phase wheel, symptom heatmap |
-| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet,CalendarScreen,InsightsScreen,PaywallScreen,ReadingsScreen}.kt` real; `ChatScreen.kt` placeholder (Phase 11) |
-| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),CalendarModelTest(17),ChartSeriesTest(13),HomeSummaryTest(8),PeriodEntryRulesTest(7),ReminderDecisionTest(9),EntitlementStateTest(6),AstrologyTest(6),InsightsAnalysisTest(5),FertilityReadoutTest(5),WorkoutAdvisorTest(5),InclinationProfileTest(4),ReminderRescheduleReceiverTest(3)}.kt` = 130 |
+| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet,CalendarScreen,InsightsScreen,PaywallScreen,ReadingsScreen,ChatScreen}.kt` all real (chat's backend still local) |
+| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),CalendarModelTest(17),ChartSeriesTest(13),HomeSummaryTest(8),ChatModerationPolicyTest(9),PeriodEntryRulesTest(7),ReminderDecisionTest(9),EntitlementStateTest(6),AstrologyTest(6),ChatIdentityFactoryTest(6),InsightsAnalysisTest(5),FertilityReadoutTest(5),WorkoutAdvisorTest(5),InclinationProfileTest(4),ChatReportTest(5),ChatVisibilityTest(5),ChatRepositoryImplTest(4),ReminderRescheduleReceiverTest(3)}.kt` = 159 |
 | Instrumentation | `src/androidTest/.../{DatabasePersistenceTest,MigrationSchemaTest}.kt` (4) |
 | Schema baseline | `app/schemas/com.bloomcycle.app.data.local.AppDatabase/1.json` |
 
@@ -100,14 +106,16 @@ One branch → PR → merge per phase, never a direct push to `main`. Pattern:
 | plan sync (docs) | `plan-sync-6-8` | #10 ✅ |
 | 9 entitlements & paywall | `phase-9-entitlements` | #11 ✅ |
 | 10 premium analyses | `phase-10-premium-analyses` | #12 ✅ |
+| 11 chat (on-device half) | `phase-11-chat` | #13 ✅ |
 
 `origin` = `https://github.com/Abhinavpatra/app-test.git`, `gh` v2.69.0 authenticated as
 `Abhinavpatra`. Run `git log --oneline -10` for the live list.
 
 ### Known gaps (tracked per phase in §10)
 
-- **Chat is still a placeholder** — Home, Settings, Onboarding, both log sheets, Calendar (Phase 6)
-  and Insights (Phase 7) are real; Chat lands in Phase 11.
+- **Chat's on-device half is real; the backend is not** — rooms, pseudonyms, moderation and
+  report/block ship in PR #13; messages still live in the local Room stub, and `ChatScreen` has
+  never spoken to a server.
 - **Reminder *policy* is complete, on-device firing is not** — settings changes, every log action and
   `BOOT_COMPLETED`/timezone/clock broadcasts all reschedule through `AppContainer.resyncReminder()`,
   but the acceptance's manual firing test still needs the emulator (Phase 12).
@@ -170,6 +178,7 @@ com.bloomcycle.app/
 │   ├── notifications/             ✅ ReminderDecision.kt (the whole notification policy)
 │   ├── wellness/                  ✅ WorkoutAdvisor.kt   ⏳ PainReliefContent, LiteratureReference
 │   ├── insight/                   ✅ Astrology.kt, InclinationProfile.kt
+│   ├── chat/                      ✅ ChatModerationPolicy, ChatReport, ChatVisibility, ChatIdentityFactory
 │   └── repository/                ✅ Repositories.kt (all interfaces)
 │
 ├── data/
@@ -189,7 +198,7 @@ com.bloomcycle.app/
 │   ├── components/                ✅ Components.kt, Placeholder.kt, DateField.kt, PremiumGate.kt
 │   ├── format/                     ✅ DateText.kt (date copy + picker conversion)
 │   ├── screens/                   ✅ Home, Settings, Onboarding, PeriodLogSheet, SymptomLogSheet
-│   │                               ✅ Calendar, Insights, Paywall, Readings   ⏳ Chat (placeholder)
+│   │                               ✅ Calendar, Insights, Paywall, Readings, Chat (local rooms)
 │   ├── AppContainer.kt             ✅ LocalAppContainer + rememberAppContainer()
 │   └── BloomApp.kt                ✅ NavHost, onboarding gate, reminder scheduling
 │
@@ -627,7 +636,7 @@ Confidence rubric:
 |---|---|---|---|---|
 | 1 | Tracks periods | 5 | No | ✅ logging flow, home card, undo delete |
 | 2 | Charts explaining | 7 | Partly | ✅ canvas charts + written analysis (written reading = Premium) |
-| 3 | Global/local chat, phase-matched women | 11 | No | ⬜ local stub only |
+| 3 | Global/local chat, phase-matched women | 11 | No | ✅ two rooms (global + phase), pseudonyms, moderation, report/block — all local; Firestore ⬜ (Q10) |
 | 4 | Stored in DB, encrypted with local key | 4 | No | ✅ SQLCipher + Keystore, verified on device (4/4 instrumentation tests) |
 | 5 | Calendar based | 6 | No | ✅ month grid, day sheet, legend, year strip |
 | 6 | Tips for cramps/pain | 8 | No | ✅ `ContentLibrary` |
@@ -640,7 +649,7 @@ Confidence rubric:
 | 13 | Notifications during / before, time-of-month aware | 8 | No | ✅ `ReminderDecision` policy, channels, boot/timezone rescheduling |
 | 14 | **Premium:** Gym / run intensity by cycle phase | 10 | Yes | ✅ `WorkoutAdvisor` — per-phase intensity + the listen-to-your-body note |
 | 15 | Soft inclusive language, smooth adaptive UI | 2, 12 | No | ✅ design system, ⬜ copy review |
-| 16 | 1-slide chat entry point | 11 | No | ⬜ placeholder screen |
+| 16 | 1-slide chat entry point | 11 | No | ✅ Home card → Chat tab |
 
 ---
 
@@ -1045,21 +1054,47 @@ deferred with the rest of the device work, Phase 12 / Q9).
 
 ---
 
-### Phase 11 — Firebase Chat ⬜ not started (local stub in place)
+### Phase 11 — Firebase Chat · **11a ✅ merged (`phase-11-chat`, PR #13)** · 11b blocked on Q10
 **Effort:** ~5–7 days
 
-> Pre-work already on `main`: `domain/repository/Repositories.kt` declares `ChatRepository`;
+> Pre-work on `main` since Phase 0: `domain/repository/Repositories.kt` declares `ChatRepository`;
 > `data/repo/ChatRepositoryImpl.kt` is a **local Room-backed stub** over a `chat_messages` entity;
-> `ui/screens/ChatScreen.kt` is a placeholder; `BuildConfig.FIREBASE_CHAT = false` gates the real
-> backend; `ChatMessage` already carries a coarse `phaseBucket` (§7.4 shape is respected).
-> **The `chat_messages` table must be dropped the day Firestore lands** — chat must never sit in the
-> encrypted DB (§7.4). Note also that `seedChatFor()` was removed: the app shows an honest empty
-> room rather than seeded fake messages.
+> `BuildConfig.FIREBASE_CHAT = false` gates the real backend; `ChatMessage` already carries a coarse
+> `phaseBucket` (§7.4 shape is respected). **The `chat_messages` table must be dropped the day
+> Firestore lands** — chat must never sit in the encrypted DB (§7.4). Note also that
+> `seedChatFor()` was removed: the app shows an honest empty room rather than seeded fake messages.
+>
+> The phase is split because the backend half is blocked on `google-services.json` (Q10). 11a —
+> everything a room needs before there is a server — is merged as PR #13.
 
-- [ ] Firebase project setup; `google-services.json` gitignored; per-build-type config.
+**11a — merged (PR #13):**
+
+- [x] **Chat UI:** one entry point on Home (README line 2) → `ChatScreen`, with a global room and a
+      phase room, switched by two pills that carry a tick as well as colour, and an honest empty
+      room when nobody has posted.
+- [x] **Phase bucketing (§7.4):** `ChatIdentityFactory.create(...)` builds every send's identity —
+      pseudonym + `ChatBuckets.forPhase` + `ChatBuckets.forCycleLength`. **Never an exact date or a
+      birth date**, and the privacy line saying so is on screen.
+- [x] **Pseudonyms:** generated locally the first time the room opens, editable from the header,
+      stripped of `|` and `/` (the report log's separators) and capped at 24 characters.
+- [x] **`ChatModerationPolicy`:** 500-character cap, 15s between sends, a short reviewable abuse
+      filter — the composer states the reason and the wait, never a bare refusal.
+- [x] **Report flow:** four fixed reasons, an in-app report record persisted in local settings
+      (capped at 100), the message hidden for the reporter the moment they tap. **Assume someone
+      will post something harmful — the report path exists before launch.**
+- [x] **Block:** removes every message from that author for this user, alongside the per-message
+      report. Reporting never hides someone for *other* users from this device alone.
+- [x] `AppContainer.chatRepository` declared as the `ChatRepository` interface, mirroring the
+      entitlement seam, so flipping `FIREBASE_CHAT` never touches a screen.
+- [x] Tests: `ChatModerationPolicyTest` (9), `ChatIdentityFactoryTest` (6), `ChatReportTest` (5),
+      `ChatVisibilityTest` (5), `ChatRepositoryImplTest` (4, Turbine) → **159/159 green**.
+
+**11b — blocked on `google-services.json` (Q10):**
+
+- [ ] Firebase project setup; `google-services.json` gitignored; per-build-type config; **verify the
+      `google-services` plugin works with AGP 9.4.1 (carried from Phase 0, risk R4)**.
 - [ ] Anonymous Auth — sign in silently on first launch; no email, no phone, no PII.
-- [ ] `ChatRepository` interface in `domain/` ✅ + Firestore implementation in `data/remote/`.
-- [ ] Phase bucketing (§7.4): `phaseBucket` + `cycleLengthBand` only. **Never exact dates or birth data.**
+- [ ] Firestore implementation in `data/remote/`, chosen by `BuildConfig.FIREBASE_CHAT = true`.
 - [ ] Firestore schema:
   ```
   chats/{roomId}/messages/{messageId}
@@ -1070,15 +1105,13 @@ deferred with the rest of the device work, Phase 12 / Q9).
 - [ ] Composite index on `(phaseBucket, createdAt)`.
 - [ ] **App Check (Play Integrity)** — essential for a health app with user-generated content.
   Without it, the Firestore bill is trivially abusable.
-- [ ] Chat UI: 1 entry point on Home (README line 2), global room + smaller phase rooms, soft
-      content reporting + a "block" affordance.
-- [ ] Rate limiting, message length caps, profanity/basic-abuse filter, and a blocklist check.
-- [ ] `ChatModerationPolicy` and an in-app report flow. **Assume someone will post something
-      harmful — there must be a report path before launch.**
+- [ ] Rate limiting and the blocklist re-enforced server-side; report records pushed to the backend.
 - [ ] Graceful offline state: queue messages, retry, clear "can't reach the circle" messaging.
-- [ ] Premium: respectful gating only (e.g. unlimited history). **Never gate the ability to post.**
+- [ ] Drop `chat_messages`: DB version 2 + migration + `MigrationSchemaTest` extended (§6.3).
+- [ ] Premium: respectful gating only (e.g. unlimited history). **Never gate the ability to post —
+      nothing in 11a is gated, and nothing in 11b will be.**
 
-**Acceptance:** Two devices on the same `phaseBucket` see each other's messages; security rules
+**Acceptance (11b):** Two devices on the same `phaseBucket` see each other's messages; security rules
 block a client from writing another user's message; with airplane mode on, the app degrades
 gracefully and never crashes; a reported message is hidden from other users.
 
@@ -1088,7 +1121,7 @@ gracefully and never crashes; a reported message is hidden from other users.
 **Effort:** ~4–6 days · **Also carries the Phase 2 accessibility audit and the Phase 8 content copy review.**
 
 - [ ] Full unit + instrumentation test pass; CycleCalculator coverage ≥ 90%.
-      (Unit side: 104 tests exist; instrumentation side: 4 exist.)
+      (Unit side: 159 tests exist; instrumentation side: 4 exist.)
 - [ ] **Phase 8's deferred firing test** — schedule a reminder for now+2 minutes on `Pixel_9`,
       confirm it posts within a minute, that disabling notifications silences it, and that a
       timezone change reschedules (Q9, `ReminderSchedulerTest` as instrumentation if useful).
@@ -1165,17 +1198,19 @@ State these now so they do not creep in:
 
 ## 14. Where We Are & Next Actions
 
-**Position:** Phases 0–10 merged to `main`. Build green, **130/130 unit tests + 4/4 instrumentation
-tests**, schema baseline committed, installable APK at
+**Position:** Phases 0–10 merged to `main`, plus Phase 11's on-device half (PR #13). Build green,
+**159/159 unit tests + 4/4 instrumentation tests**, schema baseline committed, installable APK at
 `app\build\outputs\apk\debug\app-debug.apk` (see `README.md`).
 
 **Next, in order:**
 
-1. **Phase 11 — Firebase Chat:** needs `google-services.json` (Q10); until then the local Room
-   stub stands and `BuildConfig.FIREBASE_CHAT = false`.
-2. Then 12 — accessibility/copy audits, the deferred device tests (Phase 8 firing, Phase 10
-   rendering), Play Store readiness.
-3. Still open across phases: `google-services.json` (Q10 → Phase 11), Phase 0's Firebase/AGP 9
+1. **Phase 11b — Firebase chat:** blocked on `google-services.json` (Q10). When it lands: apply the
+   `google-services` plugin and verify it against AGP 9.4.1 (R4), Anonymous Auth, the Firestore
+   `ChatRepository` behind `BuildConfig.FIREBASE_CHAT`, security rules + composite index + App Check,
+   the offline queue, and dropping `chat_messages`.
+2. **Phase 12 — polish:** accessibility/copy audits, the deferred device tests (Phase 8 firing,
+   Phase 10 rendering, Phase 11 report/block on device), Play Store readiness.
+3. Still open across phases: `google-services.json` (Q10 → 11b), Phase 0's Firebase/AGP 9
    verification, a review of `ContentLibrary.kt` citations (Q2 → Phase 12), Phase 8's deferred
    on-device firing test (Q9), and real Play Billing behind `BuildConfig.BILLING` (store release).
 
