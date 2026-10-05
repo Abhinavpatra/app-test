@@ -1,10 +1,10 @@
 # Implementation Plan — Period Tracking App ("Bloom")
 
-Status: **in progress.** Phases 0–10 merged to `main` (Phases 5–10 delivered logging, calendar,
-insights, the notification policy, the premium seam and the three analyses). Phase 11 is split:
-the **on-device half — chat rooms, pseudonyms, moderation, report/block — is merged as PR #13**,
-the Firebase half is blocked on `google-services.json` (Q10). **159 unit + 4 instrumentation tests**
-green. Phase 12 not started.
+Status: **in progress.** Phases 0–10 merged to `main`, plus Phase 11 fully done — the on-device
+half (chat rooms, pseudonyms, moderation, report/block — PR #13) and the Firebase backend
+(anonymous auth, Firestore rooms, rules, App Check, `chat_messages` dropped — PR #14).
+**166 unit + 5 instrumentation tests** green (4 executed on-device, 1 new migration test written
+for the Phase 12 device session). Phase 12 not started.
 Last reviewed: 2026-10-06
 Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 
@@ -12,14 +12,16 @@ Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 push → open PR with `gh` → merge into `main` → delete the branch. Never push directly to `main`.
 
 **Verified green:**
-- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **159/159 unit tests**
+- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **166/166 unit tests**
   (CycleCalculator 31, PhaseResolver 11, CalendarModel 17, ChartSeries 13, HomeSummary 8,
   ChatModerationPolicy 9, PeriodEntryRules 7, ReminderDecision 9, EntitlementState 6, Astrology 6,
   ChatIdentityFactory 6, InsightsAnalysis 5, FertilityReadout 5, WorkoutAdvisor 5,
-  InclinationProfile 4, ChatReport 5, ChatVisibility 5, ChatRepositoryImpl 4,
-  ReminderRescheduleReceiver 3).
+  InclinationProfile 4, ChatReport 5, ChatVisibility 5, InMemoryChatRepository 5,
+  FirestoreChatRepository 6, ReminderRescheduleReceiver 3).
 - `.\gradlew.bat :app:connectedDebugAndroidTest` on emulator `Pixel_9` → **4/4 instrumentation tests**
-  (plaintext-canary, fresh reopen, schema create, live-schema-vs-JSON).
+  (plaintext-canary, fresh reopen, schema create, live-schema-vs-JSON), run before the 11b schema
+  change. The new `migration_1_to_2` test is written and queued for the Phase 12 device session
+  (now 5 instrumentation tests total).
 
 ---
 
@@ -44,8 +46,9 @@ Recommended sequencing, in priority order (phase numbers match §10):
    reminder decision (early-signal nudges, boot/timezone rescheduling), the six-month projection.
 7. ✅ **Entitlements & paywall** (Phase 9). The billing seam, the paywall screen, the debug unlock.
 8. ✅ **Premium analyses** (Phase 10). Fertility window, movement by phase, moon sign, inclinations.
-9. ✅ **Chat rooms, on-device half** (Phase 11a). Pseudonyms, global + phase rooms, moderation,
-   report and block — waiting only on Firebase for the server side (11b, Q10).
+9. ✅ **Chat rooms, both halves** (Phase 11). 11a: pseudonyms, global + phase rooms, moderation,
+   report and block (PR #13). 11b: Firebase backend — anonymous auth, Firestore rooms behind
+   `FIREBASE_CHAT`, security rules, App Check, local chat table dropped (PR #14).
 10. Everything else in the README is layered on top of that loop.
 
 Estimated solo build: **6–8 weeks** to a shippable v1 covering all README features except real
@@ -55,8 +58,8 @@ payments and live chat.
 
 ## 2. Current State — What Actually Exists
 
-The template is gone. This is now a real codebase: **88 Kotlin source files (67 main, 19 unit test,
-2 instrumentation), 159 passing unit tests + 4 passing on-device tests, a Fraunces/Karla type system,
+The template is gone. This is now a real codebase: **93 Kotlin source files (71 main, 20 unit test,
+2 instrumentation), 166 passing unit tests + 5 on-device tests (4 executed, 1 queued), a Fraunces/Karla type system,
 and one merged PR per completed phase.**
 
 ### Done (Phases 0–10)
@@ -68,7 +71,7 @@ and one merged PR per completed phase.**
 | Domain models | `domain/model/Models.kt`, `domain/model/SymptomCatalog.kt` |
 | Cycle engine | `domain/cycle/CycleCalculator.kt`, `domain/cycle/PhaseResolver.kt` |
 | Domain logic | `domain/home/HomeSummary.kt` (Today card), `domain/validation/PeriodEntryRules.kt` |
-| Repositories | `domain/repository/Repositories.kt` + `data/repo/{Cycle,Settings,Entitlement,Chat,Content}RepositoryImpl.kt` |
+| Repositories | `domain/repository/Repositories.kt` + `data/repo/{Cycle,Settings,Entitlement,Content}RepositoryImpl.kt`, `data/repo/InMemoryChatRepository.kt`, `data/remote/{AuthSession,FirestoreChatDataSource,FirestoreChatRepository}.kt` |
 | Content | `domain/content/ContentLibrary.kt` — ~15 curated, cited items |
 | Persistence | `data/local/{Entities,Daos,Converters,AppDatabase,DatabaseFactory}.kt`, `data/crypto/PassphraseProvider.kt` |
 | Entitlements | `data/repo/{EntitlementRepositoryImpl,BillingEntitlementRepository}.kt` — seam picked by `BuildConfig.BILLING` |
@@ -77,10 +80,10 @@ and one merged PR per completed phase.**
 | Shell | `ui/BloomApp.kt`, `ui/navigation/BloomDestination.kt`, `ui/phase/PhaseVisuals.kt`, `ui/SoundEffects.kt` |
 | Components | `ui/components/{Components,Placeholder,DateField,PremiumGate}.kt`, `ui/format/DateText.kt` |
 | Charts | `ui/charts/Charts.kt` — cycle-length line, period-duration bars, phase wheel, symptom heatmap |
-| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet,CalendarScreen,InsightsScreen,PaywallScreen,ReadingsScreen,ChatScreen}.kt` all real (chat's backend still local) |
-| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),CalendarModelTest(17),ChartSeriesTest(13),HomeSummaryTest(8),ChatModerationPolicyTest(9),PeriodEntryRulesTest(7),ReminderDecisionTest(9),EntitlementStateTest(6),AstrologyTest(6),ChatIdentityFactoryTest(6),InsightsAnalysisTest(5),FertilityReadoutTest(5),WorkoutAdvisorTest(5),InclinationProfileTest(4),ChatReportTest(5),ChatVisibilityTest(5),ChatRepositoryImplTest(4),ReminderRescheduleReceiverTest(3)}.kt` = 159 |
-| Instrumentation | `src/androidTest/.../{DatabasePersistenceTest,MigrationSchemaTest}.kt` (4) |
-| Schema baseline | `app/schemas/com.bloomcycle.app.data.local.AppDatabase/1.json` |
+| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet,CalendarScreen,InsightsScreen,PaywallScreen,ReadingsScreen,ChatScreen}.kt` all real (chat reads Firestore when `FIREBASE_CHAT` is true, with an offline banner from snapshot metadata) |
+| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),CalendarModelTest(17),ChartSeriesTest(13),HomeSummaryTest(8),ChatModerationPolicyTest(9),PeriodEntryRulesTest(7),ReminderDecisionTest(9),EntitlementStateTest(6),AstrologyTest(6),ChatIdentityFactoryTest(6),InsightsAnalysisTest(5),FertilityReadoutTest(5),WorkoutAdvisorTest(5),InclinationProfileTest(4),ChatReportTest(5),ChatVisibilityTest(5),InMemoryChatRepositoryTest(5),FirestoreChatRepositoryTest(6),ReminderRescheduleReceiverTest(3)}.kt` = 166 |
+| Instrumentation | `src/androidTest/.../{DatabasePersistenceTest,MigrationSchemaTest}.kt` (5 — the new `migration_1_to_2` queued for the device session) |
+| Schema baselines | `app/schemas/com.bloomcycle.app.data.local.AppDatabase/{1,2}.json` (v2 drops `chat_messages`) |
 
 ### Removed from the template
 
@@ -107,19 +110,20 @@ One branch → PR → merge per phase, never a direct push to `main`. Pattern:
 | 9 entitlements & paywall | `phase-9-entitlements` | #11 ✅ |
 | 10 premium analyses | `phase-10-premium-analyses` | #12 ✅ |
 | 11 chat (on-device half) | `phase-11-chat` | #13 ✅ |
+| 11b chat (Firebase backend) | `phase-11b-firebase` | #14 ⬜ |
 
 `origin` = `https://github.com/Abhinavpatra/app-test.git`, `gh` v2.69.0 authenticated as
 `Abhinavpatra`. Run `git log --oneline -10` for the live list.
 
 ### Known gaps (tracked per phase in §10)
 
-- **Chat's on-device half is real; the backend is not** — rooms, pseudonyms, moderation and
-  report/block ship in PR #13; messages still live in the local Room stub, and `ChatScreen` has
-  never spoken to a server.
+- **Chat's backend is wired but not yet deployed or device-verified** — Firestore rooms, rules,
+  App Check and the v2 migration ship in PR #14; still pending: `firebase deploy` of rules/indexes
+  (CLI login needed), the App Check console steps (debug token, Play Integrity enrol, enforce), and
+  the two-device/airplane-mode acceptance plus the `migration_1_to_2` run (Phase 12 device session).
 - **Reminder *policy* is complete, on-device firing is not** — settings changes, every log action and
   `BOOT_COMPLETED`/timezone/clock broadcasts all reschedule through `AppContainer.resyncReminder()`,
   but the acceptance's manual firing test still needs the emulator (Phase 12).
-- **Firebase still blocked** — no `google-services.json`; `BuildConfig.FIREBASE_CHAT = false` (Q10).
 
 ### Fixed this phase (Phase 5)
 
@@ -301,17 +305,21 @@ navigationCompose = "2.10.2"   # Navigation 2, not Navigation 3 — see §4 devi
 composeBom      = "2025.12.00"
 ```
 
-Not pinned / not adopted: **Hilt** (§5.2), **Firebase BOM + google-services plugin** (blocked on
-`google-services.json`; gated by `BuildConfig.FIREBASE_CHAT = false`), **Navigation 3**.
-Added this phase: **room3-testing** (`androidTestImplementation`) + `kotlinx-serialization-json`/`-core`
-pinned to `1.8.1` — see §5.4.
+Not pinned / not adopted: **Hilt** (§5.2), **Navigation 3**.
+Firebase adopted in Phase 11b: **`com.google.gms.google-services` 4.5.0 + Firebase BoM 34.19.0**
+→ `firebase-auth`, `firebase-firestore`, `firebase-appcheck*` — plugin applied only when
+`google-services.json` is present (`app/` copy, gitignored), so a fresh clone still builds
+(§5.3, R4 ✅ verified green).
+Added in Phase 11b: the six Firebase entries above; `FIREBASE_CHAT` derives from the same file
+check. (Phase 4 added **room3-testing** + `kotlinx-serialization-json`/`-core` pinned to
+`1.8.1` — see §5.4.)
 
 Enabled in `app/build.gradle.kts`:
 
 ```kotlin
 buildFeatures { compose = true; buildConfig = true }
 compileOptions { isCoreLibraryDesugaringEnabled = true }   // java.time on minSdk 24
-buildConfigField("boolean", "FIREBASE_CHAT", "false")
+buildConfigField("boolean", "FIREBASE_CHAT", hasFirebaseConfig.toString())   // true iff the json is present
 ```
 
 Library list:
@@ -323,8 +331,9 @@ Library list:
 | Async / scheduling | `androidx.work:work-runtime-ktx` | ✅ |
 | Settings | `androidx.datastore:datastore-preferences` | ✅ |
 | Navigation | `androidx.navigation:navigation-compose` (Nav 2) | ✅ |
-| Chat | Firebase BOM → `firebase-auth`, `firebase-firestore` | ⏳ blocked on `google-services.json` |
-| Firebase config | `com.google.gms.google-services` plugin | ⏳ verify with AGP 9.4.1 at Phase 11 |
+| Chat | Firebase BOM 34.19.0 → `firebase-auth`, `firebase-firestore` | ✅ Phase 11b |
+| Firebase config | `com.google.gms.google-services` 4.5.0 plugin, conditional on the json | ✅ Phase 11b (R4 verified green) |
+| App Check | `firebase-appcheck`, `-debug`, `-playintegrity` (plain `implementation`; `BuildConfig.DEBUG` picks the factory) | ✅ Phase 11b (console registration pending) |
 | Tests | `app.cash.turbine`, `kotlinx-coroutines-test` | ✅ · `room3-testing` ✅ (Phase 4) |
 
 ### 5.4 ⚠️ Room 3 gotchas (hit and already paid for)
@@ -366,8 +375,9 @@ both overloads exist — give it an explicit type argument.
 that fights Compose's layout and keeps the chart set exactly tailored to cycle data.
 
 **Note on Firebase + AGP 9 / Gradle 9.6:** the `google-services` plugin historically lags new AGP
-major versions. Verify the plugin works with AGP 9.4.1 **in Phase 1, not Phase 10**. If it fails,
-either bump the plugin or bypass it with a manual `FirebaseOptions` initialization.
+major versions. ✅ **Verified in Phase 11b** — plugin 4.5.0 applies cleanly on AGP 9.4.1 /
+Gradle 9.6 (`assembleDebug` green with the json present). Had it failed, the fallback was a manual
+`FirebaseOptions` initialization in `BloomApplication` — kept in mind as the escape hatch.
 
 ---
 
@@ -375,7 +385,8 @@ either bump the plugin or bypass it with a manual `FirebaseOptions` initializati
 
 ### 6.1 Room entities — ✅ implemented (with changes)
 
-As written in `data/local/Entities.kt` (version 1, `bloom.db`):
+As written in `data/local/Entities.kt` (version 2, `bloom.db` — v2 dropped `chat_messages`
+when chat moved to Firestore in Phase 11b):
 
 ```kotlin
 @Entity(tableName = "period_events", indices = [Index(["startDate"], unique = true)])
@@ -1054,18 +1065,18 @@ deferred with the rest of the device work, Phase 12 / Q9).
 
 ---
 
-### Phase 11 — Firebase Chat · **11a ✅ merged (`phase-11-chat`, PR #13)** · 11b blocked on Q10
+### Phase 11 — Firebase Chat · **11a ✅ merged (PR #13)** · **11b ✅ (PR #14 ⬜)**
 **Effort:** ~5–7 days
 
 > Pre-work on `main` since Phase 0: `domain/repository/Repositories.kt` declares `ChatRepository`;
-> `data/repo/ChatRepositoryImpl.kt` is a **local Room-backed stub** over a `chat_messages` entity;
-> `BuildConfig.FIREBASE_CHAT = false` gates the real backend; `ChatMessage` already carries a coarse
-> `phaseBucket` (§7.4 shape is respected). **The `chat_messages` table must be dropped the day
-> Firestore lands** — chat must never sit in the encrypted DB (§7.4). Note also that
-> `seedChatFor()` was removed: the app shows an honest empty room rather than seeded fake messages.
+> the 11a local Room-backed stub (`ChatRepositoryImpl.kt` over `chat_messages`) was **removed in
+> 11b** and the table dropped (DB v2) — chat must never sit in the encrypted DB (§7.4).
+> `ChatMessage` already carried a coarse `phaseBucket` (§7.4 shape is respected).
+> `seedChatFor()` was removed in 11a: the app shows an honest empty room, never seeded fakes.
 >
-> The phase is split because the backend half is blocked on `google-services.json` (Q10). 11a —
-> everything a room needs before there is a server — is merged as PR #13.
+> 11a — everything a room needs before there is a server — merged as PR #13. `google-services.json`
+> (project `w-app-a31fe`, package `com.bloomcycle.app`) landed at the repo root, and 11b built the
+> backend on it as PR #14.
 
 **11a — merged (PR #13):**
 
@@ -1089,55 +1100,117 @@ deferred with the rest of the device work, Phase 12 / Q9).
 - [x] Tests: `ChatModerationPolicyTest` (9), `ChatIdentityFactoryTest` (6), `ChatReportTest` (5),
       `ChatVisibilityTest` (5), `ChatRepositoryImplTest` (4, Turbine) → **159/159 green**.
 
-**11b — blocked on `google-services.json` (Q10):**
+**11b — merged as PR #14, in this order:**
 
-- [ ] Firebase project setup; `google-services.json` gitignored; per-build-type config; **verify the
-      `google-services` plugin works with AGP 9.4.1 (carried from Phase 0, risk R4)**.
-- [ ] Anonymous Auth — sign in silently on first launch; no email, no phone, no PII.
-- [ ] Firestore implementation in `data/remote/`, chosen by `BuildConfig.FIREBASE_CHAT = true`.
-- [ ] Firestore schema:
-  ```
-  chats/{roomId}/messages/{messageId}
-     text, pseudonymousName, phaseBucket, cycleLengthBand, createdAt
-  ```
-- [ ] Firestore security rules — a client may create only its own message, and only with a
-  `phaseBucket` it is allowed to claim; no listing of other users' identifiers.
-- [ ] Composite index on `(phaseBucket, createdAt)`.
-- [ ] **App Check (Play Integrity)** — essential for a health app with user-generated content.
-  Without it, the Firestore bill is trivially abusable.
-- [ ] Rate limiting and the blocklist re-enforced server-side; report records pushed to the backend.
-- [ ] Graceful offline state: queue messages, retry, clear "can't reach the circle" messaging.
-- [ ] Drop `chat_messages`: DB version 2 + migration + `MigrationSchemaTest` extended (§6.3).
-- [ ] Premium: respectful gating only (e.g. unlimited history). **Never gate the ability to post —
-      nothing in 11a is gated, and nothing in 11b will be.**
+1. **Build wiring first (R4), because everything else depends on it.**
+   - Copied the root `google-services.json` → `app/google-services.json` (gitignored; the plugin
+     only reads the module directory).
+   - `libs.versions.toml`: `googleServices = 4.5.0`, `firebaseBom = 34.19.0` + libraries
+     `google-services` plugin, `firebase-bom`, `firebase-auth`, `firebase-firestore`,
+     `firebase-appcheck`, `-debug`, `-playintegrity`.
+   - The plugin applies **only when the json exists**, and
+     `buildConfigField("boolean","FIREBASE_CHAT", …)` derives from the same file check — a fresh
+     clone or CI without the file still builds, with chat falling back to the in-memory repository.
+   - `.\gradlew.bat :app:assembleDebug` green on first wired try (after a `clean` for a stale
+     dex-cache miss, unrelated to Firebase): the AGP 9.4.1 verification R4 carried since Phase 0.
+     `BuildConfig.FIREBASE_CHAT` confirmed `true` in the generated `BuildConfig.java`. The manual
+     `FirebaseOptions` fallback in `BloomApplication` was not needed.
+2. **Data layer (`data/remote/`):**
+   - `AuthSession` seam + `FirebaseAuthSession` — silent **anonymous** sign-in on first use; no
+     email, no phone, no PII.
+   - `RemoteChatDataSource` interface + `FirestoreChatDataSource` (thin document mapper) +
+     `FirestoreChatRepository` (logic, unit-tested against a fake remote + fake auth, Turbine).
+     Field-name constants live on the data source — they are the API contract with the rules.
+   - Document shape:
+     ```
+     chats/{roomId}/messages/{messageId}
+        text, pseudonymousName, phaseBucket, cycleLengthBand, authorUid, createdAt (epoch ms),
+        serverCreatedAt (server timestamp, audit copy)
+     ```
+     `createdAt` is a client epoch-ms number so pending writes still sort and render (a
+     `serverTimestamp` field is null until ack and `orderBy` would hide queued messages).
+3. **Interface + seam:** `ChatRepository` takes a **`roomId`** instead of a `ChatScope` —
+   `ChatBuckets.roomFor(phase, scope)` is computed in `ChatScreen`, which already knows the phase —
+   plus `connection(roomId): Flow<ChatConnection>` (`LIVE`/`OFFLINE`). `AppContainer`:
+   `if (BuildConfig.FIREBASE_CHAT) FirestoreChatRepository else InMemoryChatRepository`
+   (the 11a Room stub is deleted).
+4. **Dropped `chat_messages` (§7.4, mandatory):** entity + DAO deleted, DB **version 2** with
+   `MIGRATION_1_2` (`DROP TABLE chat_messages` via `prepare(...).use { step() }` — Room 3's
+   `SQLiteConnection` has no `execSQL`), `app/schemas/…/2.json` regenerated (periods + symptoms
+   only), `MigrationSchemaTest` extended with `migration_1_to_2` (written now; executed in the
+   Phase 12 device session).
+5. **Offline state:** the same snapshot stream feeds messages and connection — `isFromCache`
+   (`MetadataChanges.INCLUDE`) maps to `OFFLINE`, shown as a "Can't reach the circle" line with a
+   TalkBack description; the in-memory repository is always `LIVE`. Firestore's own offline queue
+   does the send retry.
+6. **Server config files:** `firestore.rules` (read for any signed-in user; **create only your own
+   message** — `authorUid == request.auth.uid`, text 1–500 chars, `phaseBucket` from the fixed
+   `ChatBuckets` vocabulary, names ≤ 24 chars, no update/delete from clients), `firebase.json`,
+   `firestore.indexes.json` with the `(phaseBucket, createdAt)` composite. **Not yet deployed** —
+   `firebase deploy --only firestore:rules,firestore:indexes` needs a logged-in CLI (device-session
+   step). NOTE: a stray pre-existing `rules.json` at the repo root (uses `authorId`, allows
+   update/delete) is **not** ours and is not referenced by `firebase.json` — delete or reconcile it
+   before deploying.
+7. **App Check (Play Integrity):** initialised in `BloomApplication` — debug builds install the debug
+   provider, release installs Play Integrity, all inside `runCatching` so a missing registration
+   cannot crash startup. Both providers are plain `implementation` (not variant-split) because the
+   application class references both factories. Console steps (register debug token, enrol Play
+   Integrity, enforce) documented as a manual checklist; enforcement stays off until they are done.
+8. **Premium/abuse:** nothing about posting is gated (never has been). Client moderation from 11a
+   stands; the *authoritative* length/authorship/bucket checks are in the rules (6). Server-side
+   rate limiting and pushing report records to the backend are **deferred to a Cloud Functions
+   follow-up** — without a functions deployment target they would be files that cannot run.
+9. **Verified + ship:** `assembleDebug` + unit tests green (**166/166**: `InMemoryChatRepositoryTest`
+   5, `FirestoreChatRepositoryTest` 6, 11a's `ChatRepositoryImplTest` 4 removed), plan.md/README
+   sync, commit (4–15 words), PR #14, merge, rebuild `app-debug.apk`.
 
 **Acceptance (11b):** Two devices on the same `phaseBucket` see each other's messages; security rules
 block a client from writing another user's message; with airplane mode on, the app degrades
-gracefully and never crashes; a reported message is hidden from other users.
+gracefully and never crashes; a reported message is hidden from other users. (Device execution of
+this acceptance — two devices, airplane mode, `firebase deploy`, `migration_1_to_2` run — stays
+with the Phase 12 device session.)
 
 ---
 
-### Phase 12 — Polish, Testing & Release ⬜ not started
+### Phase 12 — Polish, Testing & Release ⬜ next (PR #15)
 **Effort:** ~4–6 days · **Also carries the Phase 2 accessibility audit and the Phase 8 content copy review.**
 
-- [ ] Full unit + instrumentation test pass; CycleCalculator coverage ≥ 90%.
-      (Unit side: 159 tests exist; instrumentation side: 4 exist.)
-- [ ] **Phase 8's deferred firing test** — schedule a reminder for now+2 minutes on `Pixel_9`,
+Split by what one machine can actually do: everything in 12a is code and ships in PR #15;
+everything in 12b needs a device or a human and is executed/recorded in the device session.
+
+**12a — device-independent (PR #15):**
+
+- [ ] Full unit test pass; **CycleCalculator coverage ≥ 90%** measured with JaCoCo wired into
+      `testDebugUnitTest` (unit side: 166 tests exist; instrumentation side: 5).
+- [ ] Copy review pass for the "soft, inclusive" tone (README line 15) — `strings.xml` **and** the
+      copy hardcoded in composables, including error states. Avoid clinical language; avoid shame
+      about irregularity.
+- [ ] Onboarding content explaining what is stored on-device vs. sent to the server (risk R8 —
+      chat is the one thing that leaves unencrypted).
+- [ ] Data export (user-requested JSON via the system file picker) and a **"Delete all my data"**
+      action wired to the existing `CycleRepository.eraseEverything()` (currently no UI at all).
+- [ ] Accessibility **static** audit: content descriptions, touch targets ≥ 48dp, font scaling,
+      RTL mirrors (`supportsRtl` is already `true`) — fix what the code shows.
+- [ ] Tablet/foldable: confirm the adaptive `NavigationSuiteScaffold` breakpoints and screen
+      padding hold at tablet widths; adjust if the code shows otherwise.
+- [ ] Release signing config (`keystore.properties` / env vars, skipped cleanly when absent) and
+      R8/ProGuard rules with the release build minified (SQLCipher ships consumer rules as of
+      4.14.0).
+- [ ] Play Store prep **documents** (in `docs/`): Data safety form answers, privacy policy
+      including the chat component, content-rating notes, target audience, medical disclaimer for
+      the listing.
+- [ ] Tests green; plan.md/README synced; PR #15 → merge → rebuild APK.
+
+**12b — device/human-blocked (recorded, not run in this environment):**
+
+- [ ] **Phase 8's deferred firing test** (Q9) — schedule a reminder for now+2 minutes on `Pixel_9`,
       confirm it posts within a minute, that disabling notifications silences it, and that a
-      timezone change reschedules (Q9, `ReminderSchedulerTest` as instrumentation if useful).
-- [ ] Accessibility audit (TalkBack, large font, contrast, RTL — `supportsRtl` is already `true`).
-- [ ] Tablet/foldable layouts.
-- [ ] Copy review pass for the "soft, inclusive" tone (README line 15) — every string, including
-      error states. Avoid clinical language; avoid shame about irregularity.
-- [ ] Onboarding content explaining what is stored on-device vs. sent to the server.
-- [ ] Data export (user-requested JSON/CSV) and "delete all my data".
-- [ ] Play Store readiness:
-  - **Health data declarations** in the Data safety form
-  - Privacy policy — required, and must describe the chat component
-  - Content rating
-  - Target-audience declarations
-  - Medical disclaimer in the listing description
-- [ ] Release signing config, ProGuard/R8 rules (SQLCipher ships consumer rules as of 4.14.0).
+      timezone change reschedules.
+- [ ] TalkBack / large-font / contrast / RTL walkthrough on a real device (the static half is 12a).
+- [ ] Phase 10 rendering check with the debug unlock; Phase 11b acceptance: two devices, rules
+      block a foreign write, airplane mode degrades gracefully.
+- [ ] `MigrationSchemaTest` run for the 1→2 `chat_messages` drop.
+- [ ] App Check console steps: register the debug token, enrol Play Integrity, then enforce.
 - [ ] Play Console internal testing track.
 
 **Acceptance:** An internal-test install on a physical device completes onboarding → log → predict →
@@ -1175,7 +1248,7 @@ notify → chat without a single crash.
 | Q7 | Tablet/foldable support required for v1, or phone-only? | Phase 2 | ⚠️ **Default taken:** phone-first, adaptive `NavigationSuiteScaffold` already handles tablet/foldable widths. Confirm before Phase 12. |
 | Q8 | Localization — is this English-only at launch? | Phase 12 | Default if unanswered: English-only, strings already externalized |
 | **Q9** | **Do you have an Android device or emulator available?** Phase 4's migration/reopen tests, Phase 8's reminder test, and Phase 12's TalkBack audit all need one. | Phase 4, 8, 12 | ✅ **Resolved:** AVD `Pixel_9` (API 16) on `emulator-5554`; Phase 4's 4 tests ran green on it. Phase 8's policy is unit-tested; its manual firing test is deferred to Phase 12 alongside the TalkBack audit. |
-| **Q10** | **Provide `google-services.json` when ready for real chat.** Until then `BuildConfig.FIREBASE_CHAT = false` and the local Room stub stands. | Phase 11 | Firebase work is deferred, not abandoned |
+| **Q10** | **Provide `google-services.json` when ready for real chat.** | Phase 11 | ✅ **Answered 2026-10-06** — file delivered (project `w-app-a31fe`); Phase 11b built and ships as PR #14 |
 
 ---
 
@@ -1198,20 +1271,21 @@ State these now so they do not creep in:
 
 ## 14. Where We Are & Next Actions
 
-**Position:** Phases 0–10 merged to `main`, plus Phase 11's on-device half (PR #13). Build green,
-**159/159 unit tests + 4/4 instrumentation tests**, schema baseline committed, installable APK at
-`app\build\outputs\apk\debug\app-debug.apk` (see `README.md`).
+**Position:** Phases 0–11 merged (11b ships as PR #14). Build green,
+**166/166 unit tests + 4/4 executed instrumentation tests** (1 new migration test queued),
+schema v2 committed, installable APK at
+`app\build\outputs\apk\debug\app-debug.apk` (see `README.md`). Still not deployed or device-verified:
+`firebase deploy` of the 11b rules/indexes, the App Check console steps, the two-device chat
+acceptance, and the `migration_1_to_2` run — all queued for the Phase 12 device session.
 
 **Next, in order:**
 
-1. **Phase 11b — Firebase chat:** blocked on `google-services.json` (Q10). When it lands: apply the
-   `google-services` plugin and verify it against AGP 9.4.1 (R4), Anonymous Auth, the Firestore
-   `ChatRepository` behind `BuildConfig.FIREBASE_CHAT`, security rules + composite index + App Check,
-   the offline queue, and dropping `chat_messages`.
-2. **Phase 12 — polish:** accessibility/copy audits, the deferred device tests (Phase 8 firing,
-   Phase 10 rendering, Phase 11 report/block on device), Play Store readiness.
-3. Still open across phases: `google-services.json` (Q10 → 11b), Phase 0's Firebase/AGP 9
-   verification, a review of `ContentLibrary.kt` citations (Q2 → Phase 12), Phase 8's deferred
-   on-device firing test (Q9), and real Play Billing behind `BuildConfig.BILLING` (store release).
+1. **Phase 11b — merge + rebuild (PR #14):** review, merge to `main`, rebuild the APK.
+2. **Phase 12a — polish (PR #15):** copy/tone pass, on-device vs server disclosure, data export +
+   delete-all, static accessibility audit, release signing + R8, Play Store prep docs, coverage.
+   The device-blocked half (12b) stays queued for the device session.
+3. Still open across phases: a review of
+   `ContentLibrary.kt` citations (Q2 → Phase 12), Phase 8's deferred on-device firing test (Q9),
+   and real Play Billing behind `BuildConfig.BILLING` (store release).
 
 **Branch/PR discipline:** one branch per phase, never push to `main`, commit messages **4–15 words**.

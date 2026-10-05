@@ -4,7 +4,6 @@ import androidx.room3.Entity
 import androidx.room3.Index
 import androidx.room3.PrimaryKey
 import com.bloomcycle.app.core.time.CycleDate
-import com.bloomcycle.app.domain.model.ChatMessage
 import com.bloomcycle.app.domain.model.FlowLevel
 import com.bloomcycle.app.domain.model.PeriodEvent
 import com.bloomcycle.app.domain.model.SymptomLog
@@ -34,21 +33,6 @@ data class SymptomLogEntity(
     val date: CycleDate,
     val symptomId: String,
     val severity: Int,
-)
-
-/**
- * Local-only chat. When the Firestore implementation lands this table is dropped:
- * messages then live on the server and must never sit in the encrypted DB.
- */
-@Entity(tableName = "chat_messages")
-data class ChatMessageEntity(
-    @PrimaryKey val id: String,
-    val text: String,
-    val authorName: String,
-    val phaseBucket: String,
-    val isOwn: Boolean,
-    val createdAt: Instant,
-    val scope: String,
 )
 
 // --- mappers -----------------------------------------------------------------------------
@@ -87,23 +71,4 @@ fun SymptomLog.toEntity() = SymptomLogEntity(
     date = date,
     symptomId = symptomId,
     severity = severity,
-)
-
-fun ChatMessageEntity.toDomain() = ChatMessage(
-    id = id,
-    text = text,
-    authorName = authorName,
-    phaseBucket = phaseBucket,
-    isOwn = isOwn,
-    createdAt = createdAt,
-)
-
-fun ChatMessage.toEntity(scope: String) = ChatMessageEntity(
-    id = id,
-    text = text,
-    authorName = authorName,
-    phaseBucket = phaseBucket,
-    isOwn = isOwn,
-    createdAt = createdAt,
-    scope = scope,
 )

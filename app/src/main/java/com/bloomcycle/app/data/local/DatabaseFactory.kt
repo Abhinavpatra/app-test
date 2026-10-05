@@ -32,6 +32,7 @@ class DatabaseFactory(
 
         return Room.databaseBuilder(context, AppDatabase::class.java, file.absolutePath)
             .setDriver(driver)
+            .addMigrations(AppDatabase.MIGRATION_1_2)
             .build()
     }
 }
