@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,6 +53,7 @@ import com.bloomcycle.app.domain.model.PeriodEvent
 import com.bloomcycle.app.domain.model.SymptomCatalog
 import com.bloomcycle.app.domain.model.SymptomLog
 import com.bloomcycle.app.domain.model.UserSettings
+import com.bloomcycle.app.ui.LocalNavController
 import com.bloomcycle.app.ui.PageScrollSound
 import com.bloomcycle.app.ui.components.EmptyState
 import com.bloomcycle.app.ui.components.Gap
@@ -62,6 +64,7 @@ import com.bloomcycle.app.ui.components.SectionHeader
 import com.bloomcycle.app.ui.components.SoftCard
 import com.bloomcycle.app.ui.format.formatDateRange
 import com.bloomcycle.app.ui.format.formatHeadingDate
+import com.bloomcycle.app.ui.navigation.BloomDestination
 import com.bloomcycle.app.ui.phase.PhaseVisual
 import com.bloomcycle.app.ui.rememberAppContainer
 import com.bloomcycle.app.ui.theme.Bloom
@@ -204,6 +207,8 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                 }
             }
 
+            item(key = "chat-entry") { ChatEntryCard() }
+
             val todaySymptoms = symptoms.filter { it.date == today }
             if (todaySymptoms.isNotEmpty()) {
                 item(key = "today-symptoms") { TodaySymptoms(todaySymptoms) }
@@ -254,6 +259,28 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             onDismiss = { symptomSheetVisible = false },
             onSave = saveSymptoms,
         )
+    }
+}
+
+/** The one slide Home gives to chat (README line 2): a door, not a preview. */
+@Composable
+private fun ChatEntryCard() {
+    val navController = LocalNavController.current
+    SoftCard(
+        onClick = { navController?.navigate(BloomDestination.Chat.route) },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Talk it through", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "Rooms with people at the same point in their cycle.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(Icons.Outlined.ChevronRight, contentDescription = null)
+        }
     }
 }
 

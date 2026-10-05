@@ -189,6 +189,13 @@ data class UserSettings(
      */
     val cycleContext: CycleContext = CycleContext.NONE,
     val chatDisplayName: String = "",
+    /**
+     * Encoded [com.bloomcycle.app.domain.chat.ChatReport] records. Local until a backend
+     * exists to receive them; the reported messages are hidden from this user meanwhile.
+     */
+    val chatReports: Set<String> = emptySet(),
+    /** Pseudonyms this user has chosen to block. Their messages never render for them. */
+    val blockedChatAuthors: Set<String> = emptySet(),
     val notificationPermissionAsked: Boolean = false,
     /** Asked once in onboarding; nullable because it is genuinely optional. */
     val birthDate: CycleDate? = null,
