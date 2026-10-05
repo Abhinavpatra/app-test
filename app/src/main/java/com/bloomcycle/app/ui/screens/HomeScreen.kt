@@ -117,6 +117,8 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                 container.cycleRepository.updatePeriod(event)
                 snackbarHostState.showSnackbar("Period updated")
             }
+            // The prediction moved, so the daily reminder follows it.
+            container.resyncReminder()
             periodSheetVisible = false
             editingPeriod = null
         }
@@ -125,6 +127,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
     val deletePeriod: (PeriodEvent) -> Unit = { period ->
         scope.launch {
             container.cycleRepository.deletePeriod(period)
+            container.resyncReminder()
             val result = snackbarHostState.showSnackbar(
                 message = "Period deleted",
                 actionLabel = "Undo",
@@ -133,6 +136,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             // The row is already gone from the list — restoring it is the undo.
             if (result == SnackbarResult.ActionPerformed) {
                 container.cycleRepository.logPeriod(period)
+                container.resyncReminder()
             }
         }
     }

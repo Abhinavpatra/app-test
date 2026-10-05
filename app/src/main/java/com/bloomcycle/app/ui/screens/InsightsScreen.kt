@@ -40,8 +40,10 @@ import com.bloomcycle.app.domain.insights.periodDurationSeries
 import com.bloomcycle.app.domain.insights.phaseWheel
 import com.bloomcycle.app.domain.insights.symptomHeatmap
 import com.bloomcycle.app.domain.model.CycleContext
+import com.bloomcycle.app.domain.model.CyclePrediction
 import com.bloomcycle.app.domain.model.PremiumFeature
 import com.bloomcycle.app.domain.model.UserSettings
+import com.bloomcycle.app.core.time.CycleDate
 import com.bloomcycle.app.ui.charts.CycleLengthChart
 import com.bloomcycle.app.ui.charts.PeriodDurationChart
 import com.bloomcycle.app.ui.charts.PhaseWheel
@@ -51,6 +53,7 @@ import com.bloomcycle.app.ui.components.PremiumBadge
 import com.bloomcycle.app.ui.components.PremiumTeaser
 import com.bloomcycle.app.ui.components.SectionHeader
 import com.bloomcycle.app.ui.components.SoftCard
+import com.bloomcycle.app.ui.format.formatDate
 import com.bloomcycle.app.ui.format.formatHeadingDate
 import com.bloomcycle.app.ui.phase.PhaseVisual
 import com.bloomcycle.app.ui.rememberAppContainer
@@ -117,6 +120,11 @@ fun InsightsScreen(modifier: Modifier = Modifier) {
     val analysisUnlocked = entitlements?.isUnlocked(PremiumFeature.ANALYSIS) == true
     val unlockAnalysis: () -> Unit = {
         scope.launch { container.entitlements.unlock(PremiumFeature.ANALYSIS) }
+    }
+
+    val longHorizonUnlocked = entitlements?.isUnlocked(PremiumFeature.LONG_HORIZON) == true
+    val unlockLongHorizon: () -> Unit = {
+        scope.launch { container.entitlements.unlock(PremiumFeature.LONG_HORIZON) }
     }
 
     Scaffold(modifier = modifier) { padding ->
@@ -203,6 +211,32 @@ fun InsightsScreen(modifier: Modifier = Modifier) {
                         Text(text = report.summary, style = ArticleStyle)
                     } else {
                         PremiumTeaser(feature = PremiumFeature.ANALYSIS, onUnlock = unlockAnalysis)
+                    }
+                }
+
+                prediction?.let { predicted ->
+                    ChartCard(
+                        title = "Six months ahead",
+                        eyebrow = "Projection",
+                        caption = if (longHorizonUnlocked) {
+                            projectionCaption(predicted)
+                        } else {
+                            "Projected period starts for the next six months, spaced by your " +
+                                "own average."
+                        },
+                        locked = !longHorizonUnlocked,
+                    ) {
+                        if (longHorizonUnlocked) {
+                            ProjectionList(
+                                dates = predicted.projectNext(months = 6),
+                                cycleLength = predicted.averageCycleLength,
+                            )
+                        } else {
+                            PremiumTeaser(
+                                feature = PremiumFeature.LONG_HORIZON,
+                                onUnlock = unlockLongHorizon,
+                            )
+                        }
                     }
                 }
             }
@@ -341,4 +375,34 @@ private fun wheelCaption(segments: List<WheelSegment>): String {
 private fun teaserLine(summary: String): String {
     val sentence = summary.substringBefore(". ").trim()
     return if (sentence.isEmpty()) summary else "$sentence."
+}
+
+// --- Six months ahead (Phase 8, PremiumFeature.LONG_HORIZON) ------------------------------
+
+private fun projectionCaption(prediction: CyclePrediction): String {
+    val dates = prediction.projectNext(months = 6)
+    if (dates.isEmpty()) return ""
+    return "Six starts, ${formatDate(dates.first())} through ${formatDate(dates.last())}, " +
+        "spaced by your ${prediction.averageCycleLength}-day average. Estimates, not dates — " +
+        "log a period and they move."
+}
+
+@Composable
+private fun ProjectionList(dates: List<CycleDate>, cycleLength: Int) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        dates.forEachIndexed { index, date ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (index == 0) "Next" else "+${cycleLength}d",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(56.dp),
+                )
+                Text(
+                    text = formatDate(date),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
 }

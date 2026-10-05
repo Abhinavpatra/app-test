@@ -6,12 +6,14 @@ import androidx.work.WorkerParameters
 import com.bloomcycle.app.BloomApplication
 import com.bloomcycle.app.R
 import com.bloomcycle.app.domain.cycle.CycleCalculator
-import java.time.LocalDate
+import com.bloomcycle.app.domain.notifications.ReminderAction
+import com.bloomcycle.app.domain.notifications.ReminderDecision
 import kotlinx.coroutines.flow.first
 
 /**
- * Decides once a day whether there is anything worth saying. Quiet by default: a
- * notification every day regardless of cycle position is the fastest way to be muted.
+ * Runs once a day and says something only when [ReminderDecision] says something. Quiet by
+ * default: a notification every day regardless of cycle position is the fastest way to be
+ * muted, and the whole policy is unit tested in the domain rather than here.
  *
  * Uses WorkManager rather than AlarmManager exact alarms, which are heavily restricted
  * from Android 12 and would need SCHEDULE_EXACT_ALARM — unnecessary at day granularity.
@@ -24,36 +26,33 @@ class ReminderWorker(
     override suspend fun doWork(): Result {
         val container = (applicationContext as BloomApplication).container
         val settings = container.settings.settings.first()
-        if (!settings.remindersEnabled) return Result.success()
-
         val today = container.cycleClock.today()
         val cycles = CycleCalculator.buildCycles(container.cycleRepository.periods())
         // HORMONAL_CONTRACEPTION yields null — nothing to remind about when there is no cycle.
         val prediction = CycleCalculator.predict(cycles, today, settings.cycleContext)
 
-        if (prediction != null && !settings.predictionsMuted) {
-            val daysUntil = prediction.daysUntilNextPeriod
+        val action = ReminderDecision.decide(
+            remindersEnabled = settings.remindersEnabled,
+            dailyNoteEnabled = settings.dailyNoteEnabled,
+            predictionsMuted = settings.predictionsMuted,
+            prediction = prediction,
+            today = today,
+        )
 
-            // A caveated context (perimenopause, postpartum) must never claim a due date:
-            // "your period may be close" on a low-confidence estimate is exactly the
-            // overreach plan.md §8.4 exists to prevent. The check-in carries no date.
-            if (!prediction.isCaveated && daysUntil in 0..2) {
-                BloomNotifications.showPeriodReminder(
-                    applicationContext,
-                    applicationContext.getString(R.string.notification_period_title),
-                    applicationContext.getString(R.string.notification_period_body),
-                )
-                return Result.success()
-            }
+        when (action) {
+            ReminderAction.PERIOD -> BloomNotifications.showPeriodReminder(
+                applicationContext,
+                applicationContext.getString(R.string.notification_period_title),
+                applicationContext.getString(R.string.notification_period_body),
+            )
 
-            // Soft early sign: the PMS window opens six days before the predicted start.
-            if (daysUntil in 3..6) {
-                BloomNotifications.showDailyNote(
-                    applicationContext,
-                    applicationContext.getString(R.string.notification_checkin_title),
-                    applicationContext.getString(R.string.notification_checkin_body),
-                )
-            }
+            ReminderAction.EARLY_SIGNAL -> BloomNotifications.showDailyNote(
+                applicationContext,
+                applicationContext.getString(R.string.notification_early_title),
+                applicationContext.getString(R.string.notification_early_body),
+            )
+
+            ReminderAction.NOTHING -> Unit
         }
         return Result.success()
     }

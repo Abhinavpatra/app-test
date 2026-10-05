@@ -11,6 +11,7 @@ import com.bloomcycle.app.data.repo.CycleRepositoryImpl
 import com.bloomcycle.app.data.repo.EntitlementRepositoryImpl
 import com.bloomcycle.app.data.repo.SettingsRepositoryImpl
 import com.bloomcycle.app.notifications.ReminderScheduler
+import kotlinx.coroutines.flow.first
 
 /**
  * Hand-rolled dependency container.
@@ -42,4 +43,24 @@ class AppContainer(context: Context) {
 
     val contentRepository: ContentRepositoryImpl by lazy { ContentRepositoryImpl() }
     val reminderScheduler: ReminderScheduler by lazy { ReminderScheduler(appContext) }
+
+    /**
+     * Re-asserts the daily reminder from the current settings and the current clock.
+     *
+     * Called whenever the logged data changes (a new period moves the prediction the worker
+     * reads), and by [com.bloomcycle.app.notifications.ReminderRescheduleReceiver] after a
+     * reboot, a timezone change or a manual clock change. One place, so "scheduled" always
+     * means the same thing everywhere.
+     */
+    suspend fun resyncReminder() {
+        val current = settings.settings.first()
+        if (current.remindersEnabled) {
+            reminderScheduler.ensureScheduled(
+                hour = current.reminderHour,
+                minute = current.reminderMinute,
+            )
+        } else {
+            reminderScheduler.cancel()
+        }
+    }
 }

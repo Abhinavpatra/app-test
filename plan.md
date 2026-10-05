@@ -1,17 +1,18 @@
 # Implementation Plan — Period Tracking App ("Bloom")
 
-Status: **in progress.** Phases 0–5 done and merged (Phase 5 verified on device: onboarding, period and
-symptom logging, home card, settings, reminder wiring; 57 unit + 4 instrumentation tests green).
-Phases 6–12 not started.
-Last reviewed: 2026-10-04
+Status: **in progress.** Phases 0–8 merged to `main` (Phases 5–8 delivered logging, calendar,
+insights and the notification policy; **104 unit + 4 instrumentation tests** green).
+Phases 9–12 not started.
+Last reviewed: 2026-10-05
 Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 
 **Working agreement (user directive):** one branch per phase → commit with a **4–15 word** message →
 push → open PR with `gh` → merge into `main` → delete the branch. Never push directly to `main`.
 
 **Verified green:**
-- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **57/57 unit tests**
-  (CycleCalculator 31, PhaseResolver 11, HomeSummary 8, PeriodEntryRules 7).
+- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **104/104 unit tests**
+  (CycleCalculator 31, PhaseResolver 11, CalendarModel 17, ChartSeries 13, HomeSummary 8,
+  PeriodEntryRules 7, ReminderDecision 9, InsightsAnalysis 5, ReminderRescheduleReceiver 3).
 - `.\gradlew.bat :app:connectedDebugAndroidTest` on emulator `Pixel_9` → **4/4 instrumentation tests**
   (plaintext-canary, fresh reopen, schema create, live-schema-vs-JSON).
 
@@ -33,8 +34,10 @@ Recommended sequencing, in priority order (phase numbers match §10):
    the reopen test caught).
 4. ✅ **Logging flow** (Phase 5). Done — onboarding, Today card, period/symptom sheets, settings,
    reminder scheduling. The minimum viable loop: user logs a period and sees it on the home card.
-5. **Calendar + insights** (Phases 6–7). The rest of the loop: logged periods on a calendar, charts.
-6. Everything else in the README is layered on top of that loop.
+5. ✅ **Calendar + insights** (Phases 6–7). The rest of the loop: logged periods on a calendar, charts.
+6. ✅ **Content, projections & notification policy** (Phase 8). Curated content library, the pure
+   reminder decision (early-signal nudges, boot/timezone rescheduling), the six-month projection.
+7. Everything else in the README is layered on top of that loop.
 
 Estimated solo build: **6–8 weeks** to a shippable v1 covering all README features except real
 payments and live chat.
@@ -59,12 +62,12 @@ and one merged PR per completed phase.**
 | Repositories | `domain/repository/Repositories.kt` + `data/repo/{Cycle,Settings,Entitlement,Chat,Content}RepositoryImpl.kt` |
 | Content | `domain/content/ContentLibrary.kt` — ~15 curated, cited items |
 | Persistence | `data/local/{Entities,Daos,Converters,AppDatabase,DatabaseFactory}.kt`, `data/crypto/PassphraseProvider.kt` |
-| Notifications | `notifications/{BloomNotifications,ReminderWorker,ReminderScheduler}.kt` + `res/drawable/ic_stat_bloom.xml` |
+| Notifications | `notifications/{BloomNotifications,ReminderWorker,ReminderScheduler,ReminderRescheduleReceiver}.kt` + `res/drawable/ic_stat_bloom.xml` |
 | Theme | `ui/theme/{Color,Type,Shape,Motion,Spacing,Theme}.kt` + 7 `res/font/*.ttf` |
 | Shell | `ui/BloomApp.kt`, `ui/navigation/BloomDestination.kt`, `ui/phase/PhaseVisuals.kt` |
 | Components | `ui/components/{Components,Placeholder,DateField}.kt`, `ui/format/DateText.kt` |
-| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet}.kt` real; `{Calendar,Insights,Chat}Screen.kt` placeholders |
-| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),HomeSummaryTest(8),PeriodEntryRulesTest(7)}.kt` |
+| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet,CalendarScreen,InsightsScreen}.kt` real; `ChatScreen.kt` placeholder (Phase 11) |
+| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),CalendarModelTest(17),ChartSeriesTest(13),HomeSummaryTest(8),PeriodEntryRulesTest(7),ReminderDecisionTest(9),InsightsAnalysisTest(5),ReminderRescheduleReceiverTest(3)}.kt` = 104 |
 | Instrumentation | `src/androidTest/.../{DatabasePersistenceTest,MigrationSchemaTest}.kt` (4) |
 | Schema baseline | `app/schemas/com.bloomcycle.app.data.local.AppDatabase/1.json` |
 
@@ -91,17 +94,19 @@ One branch → PR → merge per phase, never a direct push to `main`. Pattern:
 
 ### Known gaps (tracked per phase in §10)
 
-- **Calendar, Insights and Chat are still placeholders** — Home, Settings, Onboarding and both log
-  sheets are real (Phase 5); the other three land in Phases 6, 7 and 11.
-- **Nothing schedules `ReminderScheduler` on boot or timezone change** — settings, onboarding and log
-  actions now reschedule through `BloomApp`, but there is no `BOOT_COMPLETED` receiver (Phase 8).
+- **Chat is still a placeholder** — Home, Settings, Onboarding, both log sheets, Calendar (Phase 6)
+  and Insights (Phase 7) are real; Chat lands in Phase 11.
+- **Reminder *policy* is complete, on-device firing is not** — settings changes, every log action and
+  `BOOT_COMPLETED`/timezone/clock broadcasts all reschedule through `AppContainer.resyncReminder()`,
+  but the acceptance's manual firing test still needs the emulator (Phase 12).
 - **Firebase still blocked** — no `google-services.json`; `BuildConfig.FIREBASE_CHAT = false` (Q10).
 
 ### Fixed this phase (Phase 5)
 
 - Onboarding, `HomeScreen`, period/symptom sheets and a real `SettingsScreen` replaced the
   placeholders; `LocalAppContainer` composition local is in (`ui/AppContainer.kt`).
-- `BloomApp` is the single caller of `ReminderScheduler`, reacting to `remindersEnabled` / hour / minute.
+- `BloomApp` reacts to `remindersEnabled` / hour / minute; from Phase 8 the log actions and the
+  boot/timezone receiver go through `AppContainer.resyncReminder()` instead of calling it directly.
 - Pure domain additions with tests: `HomeSummarizer` (Today card copy) and `PeriodEntryRules`
   (log-sheet validation, including overlap and self-edit cases).
 
@@ -148,6 +153,9 @@ com.bloomcycle.app/
 │   ├── cycle/                     ✅ CycleCalculator.kt, PhaseResolver.kt
 │   │                                ⏳ PredictionEngine/Fertility folded into CycleCalculator
 │   ├── content/                   ✅ ContentLibrary.kt (pure Kotlin, not Room-seeded)
+│   ├── calendar/                  ✅ CalendarModel.kt (month matrix, day marks)
+│   ├── insights/                  ✅ ChartSeries.kt, InsightsAnalysis.kt
+│   ├── notifications/             ✅ ReminderDecision.kt (the whole notification policy)
 │   ├── wellness/                  ⏳ PainReliefContent, LiteratureReference, WorkoutAdvisor
 │   ├── insight/                   ⏳ PersonalityProfile, InclinationProfile
 │   └── repository/                ✅ Repositories.kt (all interfaces)
@@ -159,7 +167,8 @@ com.bloomcycle.app/
 │   ├── settings/                  ⏳ DataStore-backed SettingsRepositoryImpl lives in data/repo today
 │   └── remote/                    ⏳ FirebaseAuthDataSource, FirestoreChatDataSource, DTOs
 │
-├── notifications/                 ✅ BloomNotifications, ReminderWorker, ReminderScheduler
+├── notifications/                 ✅ BloomNotifications, ReminderWorker, ReminderScheduler,
+│                                   ✅ ReminderRescheduleReceiver (boot / timezone / clock)
 │
 ├── ui/
 │   ├── theme/                     ✅ Color, Type, Shape, Motion, Spacing, Theme   (= planned core/design/)
@@ -168,11 +177,11 @@ com.bloomcycle.app/
 │   ├── components/                ✅ Components.kt, Placeholder.kt, DateField.kt
 │   ├── format/                     ✅ DateText.kt (date copy + picker conversion)
 │   ├── screens/                   ✅ Home, Settings, Onboarding, PeriodLogSheet, SymptomLogSheet
-│   │                               ⏳ Calendar, Insights, Chat (placeholders)
+│   │                               ✅ Calendar, Insights   ⏳ Chat (placeholder)
 │   ├── AppContainer.kt             ✅ LocalAppContainer + rememberAppContainer()
 │   └── BloomApp.kt                ✅ NavHost, onboarding gate, reminder scheduling
 │
-└── feature/                       ⏳ — real calendar, charts, tips,
+└── feature/                       ⏳ — real calendar ✅ (Phase 6), charts ✅ (Phase 7),
                                          paywall detail: all planned, none written
 ```
 
@@ -604,19 +613,19 @@ Confidence rubric:
 
 | # | README requirement | Phase | Premium? | Status |
 |---|---|---|---|---|
-| 1 | Tracks periods | 5 | No | ⬜ data layer ✅, UI ⬜ |
-| 2 | Charts explaining | 7 | Partly | ⬜ |
+| 1 | Tracks periods | 5 | No | ✅ logging flow, home card, undo delete |
+| 2 | Charts explaining | 7 | Partly | ✅ canvas charts + written analysis (written reading = Premium) |
 | 3 | Global/local chat, phase-matched women | 11 | No | ⬜ local stub only |
 | 4 | Stored in DB, encrypted with local key | 4 | No | ✅ SQLCipher + Keystore, verified on device (4/4 instrumentation tests) |
-| 5 | Calendar based | 6 | No | ⬜ placeholder screen |
+| 5 | Calendar based | 6 | No | ✅ month grid, day sheet, legend, year strip |
 | 6 | Tips for cramps/pain | 8 | No | ✅ `ContentLibrary` |
 | 7 | What literature says about period duration | 8 | No | ✅ `ContentLibrary` (some URLs missing) |
 | 8 | **Premium:** Analysis | 9 | Yes | ⬜ gate ⬜, analysis ⬜ |
 | 9 | **Premium:** Best fertility window | 10 | Yes | ⬜ calculator ✅, presentation ⬜ |
 | 10 | **Premium:** Year to conceive — astrology / sports / academic inclinations | 10 | Yes | ⬜ |
 | 11 | "What their cycle says about them" | 10 | Yes | ⬜ |
-| 12 | Long-term prediction + early warning signs | 8 | No (long-term = Yes) | ✅ engine (`projectNext`, `CycleContext`), ⬜ Premium gate |
-| 13 | Notifications during / before, time-of-month aware | 8 | No | ⚠️ worker + channels ✅, not wired to settings |
+| 12 | Long-term prediction + early warning signs | 8 | No (long-term = Yes) | ✅ engine (`projectNext`, `CycleContext`), six-month card gated on `LONG_HORIZON`, early-signal nudge in the PMS window |
+| 13 | Notifications during / before, time-of-month aware | 8 | No | ✅ `ReminderDecision` policy, channels, boot/timezone rescheduling |
 | 14 | **Premium:** Gym / run intensity by cycle phase | 9 | Yes | ⬜ |
 | 15 | Soft inclusive language, smooth adaptive UI | 2, 12 | No | ✅ design system, ⬜ copy review |
 | 16 | 1-slide chat entry point | 11 | No | ⬜ placeholder screen |
@@ -895,7 +904,7 @@ written reading. Tests: `ChartSeriesTest` (13) + `InsightsAnalysisTest` (5).
 
 ---
 
-### Phase 8 — Content, Predictions & Notifications ⚠️ ~60% done
+### Phase 8 — Content, Predictions & Notifications ✅ merged (branch `phase-8-remainder`, PR #9)
 **Effort:** ~3–4 days
 
 - [x] Curate content for README lines 6 & 13 — **research, not coding** → `domain/content/ContentLibrary.kt`,
@@ -912,23 +921,36 @@ written reading. Tests: `ChartSeriesTest` (13) + `InsightsAnalysisTest` (5).
   - ✅ **Not** `AlarmManager.setExactAndAllowWhileIdle`, so no `SCHEDULE_EXACT_ALARM` permission.
   - ✅ Rescheduled on settings change (Phase 5): `BloomApp` calls `ensureScheduled` /
         `cancel` whenever `remindersEnabled`, `reminderHour` or `reminderMinute` changes, and
-        onboarding writes the same flags. Still missing: reschedule on every log, and a
-        `BOOT_COMPLETED` / timezone-change receiver (this phase).
+        onboarding writes the same flags.
 - [x] Runtime `POST_NOTIFICATIONS` permission on Android 13+, requested with context, never blocking.
       ✅ Requested from onboarding and from the Settings toggle (Phase 5); the answer is recorded in
       `UserSettings.notificationPermissionAsked`, so it is asked at most once.
-- [ ] Early-signals nudges during predicted PMS/luteal window. Not started.
-- [ ] Long-term (6-month) projection → **Premium**. `CyclePrediction.projectNext(months)` already
-      exists; only the `PremiumGate` around it is missing (Phase 9).
+- [x] **Reschedule on every log** — `HomeScreen` (save, update, delete, undo-restore) and
+      `CalendarScreen` (save) call `AppContainer.resyncReminder()`, so the next run follows the
+      prediction the log just moved.
+- [x] **Boot / timezone / clock receiver** — `notifications/ReminderRescheduleReceiver.kt`
+      handles `BOOT_COMPLETED`, `TIMEZONE_CHANGED` and `TIME_SET`, re-asserting the schedule from
+      the *current* clock; `RECEIVE_BOOT_COMPLETED` + `<receiver>` declared in the manifest.
+- [x] **Early-signal nudges** — `domain/notifications/ReminderDecision.kt` is the whole policy as
+      pure Kotlin: caveated contexts and `predictionsMuted` say nothing; days 0–2 send the period
+      reminder; days 3–6 inside the PMS window send the early-signal note, and only when
+      `dailyNoteEnabled` (it posts on the notes channel, so the toggle is the honest switch).
+      `ReminderWorker` now dispatches its verdict instead of deciding inline; the old generic
+      check-in copy is gone.
+- [x] **Long-term (6-month) projection → Premium** — `InsightsScreen` gains a "Six months ahead"
+      card: `PredictionList(projectNext(months = 6))` when `LONG_HORIZON` is unlocked,
+      `PremiumTeaser` when not (`PremiumGate.kt` from Phase 7).
+- [x] Tests: `ReminderDecisionTest` (9) + `ReminderRescheduleReceiverTest` (3) → **104/104 green**.
 
 **Acceptance:** A reminder fires within a minute of its scheduled time in a manual test; disabling
 notifications actually silences it; changing the device timezone reschedules correctly.
-⚠️ **Partly wired, still untested** — the settings enable/disable path is wired (Phase 5) but no
-manual firing test has been run. An emulator is available for the manual test when Phase 8 lands (Q9).
+⚠️ **Policy unit-tested, firing still manual** — `ReminderDecision` covers every branch that decides
+*whether* to speak; the "does it actually fire" test on the emulator (`Pixel_9`, Q9) is deferred to
+Phase 12, with the phases that need a device.
 
 ---
 
-### Phase 9 — Entitlements & Paywall ⚠️ ~30% done
+### Phase 9 — Entitlements & Paywall ⚠️ ~45% done
 **Effort:** ~2 days
 
 - [x] `domain/repository/EntitlementRepository.kt` — interface + `PremiumFeature` enum +
@@ -941,11 +963,13 @@ manual firing test has been run. An emulator is available for the manual test wh
       suspend fun unlock(feature: PremiumFeature)   // stub
   }
   ```
-- [ ] `LocalEntitlementRepository` → **renamed `data/repo/EntitlementRepositoryImpl.kt`**, but the
-      DataStore persistence and the **debug-only unlock toggle in a developer settings screen** are
-      not done yet.
-- [ ] `composable PremiumGate(feature) { ... }` — tasteful teaser card + paywall CTA.
-      Never a hard wall mid-task; always show the user something real first. Not written.
+- [x] `LocalEntitlementRepository` → **renamed `data/repo/EntitlementRepositoryImpl.kt`** with DataStore
+      persistence (`unlocked_features`, `debug_unlock_all`) — ✅ written, and `InsightsScreen` already
+      reads it. Still open: the **debug-only unlock toggle in a developer settings screen**.
+- [x] `ui/components/PremiumGate.kt` — `PremiumTeaser(feature, onUnlock)` tasteful teaser card,
+      written in Phase 7 and used on Insights for `ANALYSIS` and (Phase 8) `LONG_HORIZON`.
+      Still open: a generic `PremiumGate(feature) { ... }` wrapper so every other screen gets one
+      call site instead of hand-rolling the lock.
 - [ ] `ui/screens` paywall — soft, non-pressuring copy. No dark patterns, no fake countdowns, no
       fake "47 people viewing". Play Store policy risk (R2). Not written.
 - [ ] Add the billing seam: a `BillingEntitlementRepository` stub with the same interface, and a
@@ -1072,7 +1096,7 @@ notify → chat without a single crash.
 | Q6 | Do you need Health Connect integration (syncing to Google Fit / Apple Health) at any point? Significant additional work and policy surface. | Post-v1 | Default if unanswered: out of scope |
 | Q7 | Tablet/foldable support required for v1, or phone-only? | Phase 2 | ⚠️ **Default taken:** phone-first, adaptive `NavigationSuiteScaffold` already handles tablet/foldable widths. Confirm before Phase 12. |
 | Q8 | Localization — is this English-only at launch? | Phase 12 | Default if unanswered: English-only, strings already externalized |
-| **Q9** | **Do you have an Android device or emulator available?** Phase 4's migration/reopen tests, Phase 8's reminder test, and Phase 12's TalkBack audit all need one. | Phase 4, 8, 12 | ✅ **Resolved:** AVD `Pixel_9` (API 16) on `emulator-5554`; Phase 4's 4 tests ran green on it. Phases 8 and 12 can reuse it. |
+| **Q9** | **Do you have an Android device or emulator available?** Phase 4's migration/reopen tests, Phase 8's reminder test, and Phase 12's TalkBack audit all need one. | Phase 4, 8, 12 | ✅ **Resolved:** AVD `Pixel_9` (API 16) on `emulator-5554`; Phase 4's 4 tests ran green on it. Phase 8's policy is unit-tested; its manual firing test is deferred to Phase 12 alongside the TalkBack audit. |
 | **Q10** | **Provide `google-services.json` when ready for real chat.** Until then `BuildConfig.FIREBASE_CHAT = false` and the local Room stub stands. | Phase 11 | Firebase work is deferred, not abandoned |
 
 ---
@@ -1096,16 +1120,17 @@ State these now so they do not creep in:
 
 ## 14. Where We Are & Next Actions
 
-**Position:** Phases 0–7 merged to `main`. Build green, **92/92 unit tests + 4/4 instrumentation
+**Position:** Phases 0–8 merged to `main`. Build green, **104/104 unit tests + 4/4 instrumentation
 tests**, schema baseline committed, installable APK at
 `app\build\outputs\apk\debug\app-debug.apk` (see `README.md`).
 
 **Next, in order:**
 
-1. **Phase 8 remainder:** early-signal nudges in the PMS window, reschedule reminders on every
-   log, `BOOT_COMPLETED`/timezone receiver, and the 6-month projection behind `LONG_HORIZON`.
-2. Then 9 → 10 → 11 → 12, in that order.
+1. **Phase 9 — entitlements & paywall:** billing-backed unlock path (the UI gate itself exists:
+   `PremiumGate.kt`, `PremiumTeaser`, per-feature `isUnlocked`/`unlock`).
+2. Then 10 → 11 → 12, in that order.
 3. Still open across phases: `google-services.json` (Q10 → Phase 11), Phase 0's Firebase/AGP 9
-   verification, and a review of `ContentLibrary.kt` citations (Q2 → Phase 12).
+   verification, a review of `ContentLibrary.kt` citations (Q2 → Phase 12), and Phase 8's deferred
+   on-device firing test (Q9).
 
 **Branch/PR discipline:** one branch per phase, never push to `main`, commit messages **4–15 words**.

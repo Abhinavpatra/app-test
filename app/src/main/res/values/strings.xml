@@ -8,8 +8,8 @@
 
     <string name="notification_period_title">Your period may be close</string>
     <string name="notification_period_body">Sometime around today or tomorrow — how are you feeling?</string>
-    <string name="notification_checkin_title">A moment for you</string>
-    <string name="notification_checkin_body">Log how your day is going when you have a second.</string>
+    <string name="notification_early_title">Signals can start early</string>
+    <string name="notification_early_body">The days before your period can bring shifts in mood, sleep or energy. Noticing them now makes the pattern easier to read later.</string>
 
     <string name="disclaimer_entertainment">For reflection and entertainment — not medical guidance.</string>
     <string name="disclaimer_health">Bloom is not a medical device. Predictions are estimates, not certainty.</string>
