@@ -866,24 +866,32 @@ Tests: `CalendarModelTest` (17) — leap years, 365-day year walk, window edges,
 
 ---
 
-### Phase 7 — Insights & Charts ⬜ not started
+### Phase 7 - Insights & Charts ✅ merged (branch `phase-7-insights`, PR #8)
 **Effort:** ~2–3 days
 
 > Pre-work already on `main`: `ui/screens/InsightsScreen.kt` placeholder; `CycleCalculator` exposes
 > `lengthsForStats`, `regularityDays`, `regularityLabel` — the raw inputs for the line/bar charts.
 
-- [ ] Hand-drawn Compose `Canvas` charts — **no third-party chart library**:
+- [x] Hand-drawn Compose `Canvas` charts — **no third-party chart library**:
   - cycle length history (line, with predicted band)
   - period duration history (bar)
   - phase timeline / wheel
   - symptom frequency by cycle day (heatmap) ← answers README line 2 directly
   - consistency score
-- [ ] Each chart gets a text/summary alternative for accessibility.
-- [ ] `InsightsAnalysis` domain service produces the plain-language interpretation.
-- [ ] Gate advanced analytics behind Premium (README line 7); free tier keeps at least one chart.
+- [x] Each chart gets a text/summary alternative for accessibility.
+- [x] `InsightsAnalysis` domain service produces the plain-language interpretation.
+- [x] Gate advanced analytics behind Premium (README line 7); free tier keeps at least one chart.
 
 **Acceptance:** All charts render with 0, 1, and 24 cycles without crashing or dividing by zero;
 every chart has an accessible non-visual equivalent.
+
+**Delivered:** `domain/insights/ChartSeries.kt` (series defined for 0/1/24 cycles, ranges always
+plottable) + `InsightsAnalysis.kt` (`InsightsReport.summary` is the text alternative) +
+`ui/charts/Charts.kt` (line+band, bars+average, phase ring, heatmap; every canvas
+`clearAndSetSemantics {}`) + `ui/components/PremiumGate.kt` (`PremiumTeaser`, `PremiumBadge`).
+Free: lengths, durations, symptom heatmap, consistency. Premium (`ANALYSIS`): the ring and the
+written reading. Tests: `ChartSeriesTest` (13) + `InsightsAnalysisTest` (5).
+
 
 ---
 
@@ -1088,15 +1096,15 @@ State these now so they do not creep in:
 
 ## 14. Where We Are & Next Actions
 
-**Position:** Phases 0–6 merged to `main`. Build green, **74/74 unit tests + 4/4 instrumentation
+**Position:** Phases 0–7 merged to `main`. Build green, **92/92 unit tests + 4/4 instrumentation
 tests**, schema baseline committed, installable APK at
 `app\build\outputs\apk\debug\app-debug.apk` (see `README.md`).
 
 **Next, in order:**
 
-1. **Phase 7 — Insights:** hand-drawn Canvas charts, `InsightsAnalysis`, premium gate on the
-   advanced charts (free tier keeps at least one).
-2. Then 8 remainder → 9 → 10 → 11 → 12, in that order.
+1. **Phase 8 remainder:** early-signal nudges in the PMS window, reschedule reminders on every
+   log, `BOOT_COMPLETED`/timezone receiver, and the 6-month projection behind `LONG_HORIZON`.
+2. Then 9 → 10 → 11 → 12, in that order.
 3. Still open across phases: `google-services.json` (Q10 → Phase 11), Phase 0's Firebase/AGP 9
    verification, and a review of `ContentLibrary.kt` citations (Q2 → Phase 12).
 
