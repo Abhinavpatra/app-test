@@ -19,13 +19,13 @@ import com.bloomcycle.app.ui.theme.Spacing
  * The teaser where a Premium feature is locked.
  *
  * Deliberately not a wall: it says exactly what is inside, the card around it still shows
- * the free charts, and unlocking is one tap against the local entitlement store. Phase 9
- * replaces the button with a real paywall — the shape of this card stays.
+ * the free charts, and the button opens the paywall — unlocking happens there, so this
+ * card never claims a purchase it has not made.
  */
 @Composable
 fun PremiumTeaser(
     feature: PremiumFeature,
-    onUnlock: () -> Unit,
+    onOpenPaywall: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SoftCard(
@@ -44,18 +44,39 @@ fun PremiumTeaser(
         )
         Gap(Spacing.sm)
         PrimaryButton(
-            text = "Unlock",
-            onClick = onUnlock,
+            text = "Open Premium",
+            onClick = onOpenPaywall,
             modifier = Modifier.fillMaxWidth(),
         )
         Gap(Spacing.xs)
         Text(
-            text = "Unlocked on this device. Play billing arrives with the store release.",
+            text = "Logging, calendar, charts and reminders stay free — Premium only adds " +
+                "these extra readings.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+/**
+ * One call site for every gated feature: the real content when it is unlocked, the teaser
+ * when it is not. Every premium screen goes through this so a feature can never be
+ * *silently* unavailable — it is either usable or visibly one tap from the paywall.
+ */
+@Composable
+fun PremiumGate(
+    feature: PremiumFeature,
+    unlocked: Boolean,
+    onOpenPaywall: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    if (unlocked) {
+        content()
+    } else {
+        PremiumTeaser(feature = feature, onOpenPaywall = onOpenPaywall, modifier = modifier)
     }
 }
 

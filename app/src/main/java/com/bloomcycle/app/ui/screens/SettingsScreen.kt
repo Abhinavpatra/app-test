@@ -34,15 +34,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bloomcycle.app.BuildConfig
 import com.bloomcycle.app.domain.model.CycleContext
+import com.bloomcycle.app.domain.model.EntitlementState
+import com.bloomcycle.app.domain.model.PremiumFeature
 import com.bloomcycle.app.domain.model.TYPICAL_CYCLE_MAX
 import com.bloomcycle.app.domain.model.TYPICAL_CYCLE_MIN
 import com.bloomcycle.app.domain.model.UserSettings
 import com.bloomcycle.app.notifications.BloomNotifications
+import com.bloomcycle.app.ui.LocalNavController
 import com.bloomcycle.app.ui.components.CycleContextRow
 import com.bloomcycle.app.ui.components.Gap
 import com.bloomcycle.app.ui.components.SectionHeader
 import com.bloomcycle.app.ui.components.SoftCard
+import com.bloomcycle.app.ui.navigation.BloomDestination
 import com.bloomcycle.app.ui.rememberAppContainer
 import com.bloomcycle.app.ui.theme.Spacing
 import kotlinx.coroutines.launch
@@ -64,6 +70,11 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     var settings by remember { mutableStateOf<UserSettings?>(null) }
     LaunchedEffect(container) { container.settings.settings.collect { settings = it } }
     val current = settings
+
+    val entitlements by container.entitlements.state
+        .collectAsStateWithLifecycle(initialValue = EntitlementState())
+    val unlockedCount = PremiumFeature.entries.count { entitlements.isUnlocked(it) }
+    val navController = LocalNavController.current
 
     var pickingTime by remember { mutableStateOf(false) }
 
@@ -256,6 +267,66 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                             .fillMaxWidth()
                             .semantics { contentDescription = "Usual cycle length, ${current.typicalCycleLength} days" },
                     )
+                }
+            }
+
+            SectionHeader(eyebrow = "Premium", title = "Extra readings")
+
+            SoftCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Premium readings", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = if (entitlements.isDebugUnlocked) {
+                                "Every reading is unlocked — developer switch is on."
+                            } else {
+                                "$unlockedCount of ${PremiumFeature.entries.size} unlocked. " +
+                                    "Tracking, calendar and charts stay free either way."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton(
+                        onClick = { navController?.navigate(BloomDestination.PAYWALL) },
+                        modifier = Modifier.semantics { contentDescription = "Open Premium" },
+                    ) { Text("Open") }
+                }
+            }
+
+            if (BuildConfig.DEBUG) {
+                SectionHeader(eyebrow = "Developer", title = "Debug only")
+
+                SoftCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Unlock everything", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = "Opens every premium screen for testing. Debug builds " +
+                                    "only — release builds never see this switch.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = entitlements.isDebugUnlocked,
+                            onCheckedChange = { value ->
+                                scope.launch { container.entitlements.setDebugUnlocked(value) }
+                            },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Unlock every premium feature, " +
+                                    if (entitlements.isDebugUnlocked) "on" else "off"
+                            },
+                        )
+                    }
                 }
             }
 

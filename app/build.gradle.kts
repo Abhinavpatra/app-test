@@ -28,6 +28,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("boolean", "FIREBASE_CHAT", "false")
+        // Selects the billing-backed entitlement repository. v1 is false: no billing SDK
+        // ships until the store release (plan.md Phase 9), so the DataStore-backed
+        // implementation stands in behind the same interface.
+        buildConfigField("boolean", "BILLING", "false")
     }
 
     buildTypes {
