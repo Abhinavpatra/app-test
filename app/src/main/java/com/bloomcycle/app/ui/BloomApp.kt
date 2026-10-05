@@ -33,6 +33,7 @@ import com.bloomcycle.app.ui.screens.HomeScreen
 import com.bloomcycle.app.ui.screens.InsightsScreen
 import com.bloomcycle.app.ui.screens.OnboardingScreen
 import com.bloomcycle.app.ui.screens.PaywallScreen
+import com.bloomcycle.app.ui.screens.ReadingsScreen
 import com.bloomcycle.app.ui.screens.SettingsScreen
 import com.bloomcycle.app.ui.theme.BloomMotion
 
@@ -148,6 +149,9 @@ private fun BloomNavigation() {
                 composable(BloomDestination.Settings.route) { SettingsScreen() }
                 composable(BloomDestination.PAYWALL) {
                     PaywallScreen(onBack = { navController.popBackStack() })
+                }
+                composable(BloomDestination.READINGS) {
+                    ReadingsScreen(onBack = { navController.popBackStack() })
                 }
             }
         }

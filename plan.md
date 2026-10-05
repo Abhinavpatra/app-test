@@ -1,8 +1,8 @@
 # Implementation Plan — Period Tracking App ("Bloom")
 
-Status: **in progress.** Phases 0–9 merged to `main` (Phases 5–9 delivered logging, calendar,
-insights, the notification policy and the premium seam; **110 unit + 4 instrumentation tests** green).
-Phases 10–12 not started.
+Status: **in progress.** Phases 0–10 merged to `main` (Phases 5–10 delivered logging, calendar,
+insights, the notification policy, the premium seam and the three analyses; **130 unit + 4
+instrumentation tests** green). Phases 11–12 not started.
 Last reviewed: 2026-10-05
 Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 
@@ -10,10 +10,10 @@ Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 push → open PR with `gh` → merge into `main` → delete the branch. Never push directly to `main`.
 
 **Verified green:**
-- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **110/110 unit tests**
+- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **130/130 unit tests**
   (CycleCalculator 31, PhaseResolver 11, CalendarModel 17, ChartSeries 13, HomeSummary 8,
-  PeriodEntryRules 7, ReminderDecision 9, EntitlementState 6, InsightsAnalysis 5,
-  ReminderRescheduleReceiver 3).
+  PeriodEntryRules 7, ReminderDecision 9, EntitlementState 6, Astrology 6, InsightsAnalysis 5,
+  FertilityReadout 5, WorkoutAdvisor 5, InclinationProfile 4, ReminderRescheduleReceiver 3).
 - `.\gradlew.bat :app:connectedDebugAndroidTest` on emulator `Pixel_9` → **4/4 instrumentation tests**
   (plaintext-canary, fresh reopen, schema create, live-schema-vs-JSON).
 
@@ -39,7 +39,8 @@ Recommended sequencing, in priority order (phase numbers match §10):
 6. ✅ **Content, projections & notification policy** (Phase 8). Curated content library, the pure
    reminder decision (early-signal nudges, boot/timezone rescheduling), the six-month projection.
 7. ✅ **Entitlements & paywall** (Phase 9). The billing seam, the paywall screen, the debug unlock.
-8. Everything else in the README is layered on top of that loop.
+8. ✅ **Premium analyses** (Phase 10). Fertility window, movement by phase, moon sign, inclinations.
+9. Everything else in the README is layered on top of that loop.
 
 Estimated solo build: **6–8 weeks** to a shippable v1 covering all README features except real
 payments and live chat.
@@ -48,11 +49,11 @@ payments and live chat.
 
 ## 2. Current State — What Actually Exists
 
-The template is gone. This is now a real codebase: **70 Kotlin source files (58 main, 10 unit test,
-2 instrumentation), 110 passing unit tests + 4 passing on-device tests, a Fraunces/Karla type system,
+The template is gone. This is now a real codebase: **79 Kotlin source files (63 main, 14 unit test,
+2 instrumentation), 130 passing unit tests + 4 passing on-device tests, a Fraunces/Karla type system,
 and one merged PR per completed phase.**
 
-### Done (Phases 0–9)
+### Done (Phases 0–10)
 
 | Area | Files |
 |---|---|
@@ -70,8 +71,8 @@ and one merged PR per completed phase.**
 | Shell | `ui/BloomApp.kt`, `ui/navigation/BloomDestination.kt`, `ui/phase/PhaseVisuals.kt`, `ui/SoundEffects.kt` |
 | Components | `ui/components/{Components,Placeholder,DateField,PremiumGate}.kt`, `ui/format/DateText.kt` |
 | Charts | `ui/charts/Charts.kt` — cycle-length line, period-duration bars, phase wheel, symptom heatmap |
-| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet,CalendarScreen,InsightsScreen,PaywallScreen}.kt` real; `ChatScreen.kt` placeholder (Phase 11) |
-| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),CalendarModelTest(17),ChartSeriesTest(13),HomeSummaryTest(8),PeriodEntryRulesTest(7),ReminderDecisionTest(9),EntitlementStateTest(6),InsightsAnalysisTest(5),ReminderRescheduleReceiverTest(3)}.kt` = 110 |
+| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet,CalendarScreen,InsightsScreen,PaywallScreen,ReadingsScreen}.kt` real; `ChatScreen.kt` placeholder (Phase 11) |
+| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),CalendarModelTest(17),ChartSeriesTest(13),HomeSummaryTest(8),PeriodEntryRulesTest(7),ReminderDecisionTest(9),EntitlementStateTest(6),AstrologyTest(6),InsightsAnalysisTest(5),FertilityReadoutTest(5),WorkoutAdvisorTest(5),InclinationProfileTest(4),ReminderRescheduleReceiverTest(3)}.kt` = 130 |
 | Instrumentation | `src/androidTest/.../{DatabasePersistenceTest,MigrationSchemaTest}.kt` (4) |
 | Schema baseline | `app/schemas/com.bloomcycle.app.data.local.AppDatabase/1.json` |
 
@@ -98,6 +99,7 @@ One branch → PR → merge per phase, never a direct push to `main`. Pattern:
 | 8 remainder (notification policy, boot rescheduling, projection) | `phase-8-remainder` | #9 ✅ |
 | plan sync (docs) | `plan-sync-6-8` | #10 ✅ |
 | 9 entitlements & paywall | `phase-9-entitlements` | #11 ✅ |
+| 10 premium analyses | `phase-10-premium-analyses` | #12 ✅ |
 
 `origin` = `https://github.com/Abhinavpatra/app-test.git`, `gh` v2.69.0 authenticated as
 `Abhinavpatra`. Run `git log --oneline -10` for the live list.
@@ -164,10 +166,10 @@ com.bloomcycle.app/
 │   │                                ⏳ PredictionEngine/Fertility folded into CycleCalculator
 │   ├── content/                   ✅ ContentLibrary.kt (pure Kotlin, not Room-seeded)
 │   ├── calendar/                  ✅ CalendarModel.kt (month matrix, day marks)
-│   ├── insights/                  ✅ ChartSeries.kt, InsightsAnalysis.kt
+│   ├── insights/                  ✅ ChartSeries.kt, InsightsAnalysis.kt, FertilityReadout.kt
 │   ├── notifications/             ✅ ReminderDecision.kt (the whole notification policy)
-│   ├── wellness/                  ⏳ PainReliefContent, LiteratureReference, WorkoutAdvisor
-│   ├── insight/                   ⏳ PersonalityProfile, InclinationProfile
+│   ├── wellness/                  ✅ WorkoutAdvisor.kt   ⏳ PainReliefContent, LiteratureReference
+│   ├── insight/                   ✅ Astrology.kt, InclinationProfile.kt
 │   └── repository/                ✅ Repositories.kt (all interfaces)
 │
 ├── data/
@@ -187,7 +189,7 @@ com.bloomcycle.app/
 │   ├── components/                ✅ Components.kt, Placeholder.kt, DateField.kt, PremiumGate.kt
 │   ├── format/                     ✅ DateText.kt (date copy + picker conversion)
 │   ├── screens/                   ✅ Home, Settings, Onboarding, PeriodLogSheet, SymptomLogSheet
-│   │                               ✅ Calendar, Insights, Paywall   ⏳ Chat (placeholder)
+│   │                               ✅ Calendar, Insights, Paywall, Readings   ⏳ Chat (placeholder)
 │   ├── AppContainer.kt             ✅ LocalAppContainer + rememberAppContainer()
 │   └── BloomApp.kt                ✅ NavHost, onboarding gate, reminder scheduling
 │
@@ -631,12 +633,12 @@ Confidence rubric:
 | 6 | Tips for cramps/pain | 8 | No | ✅ `ContentLibrary` |
 | 7 | What literature says about period duration | 8 | No | ✅ `ContentLibrary` (some URLs missing) |
 | 8 | **Premium:** Analysis | 9 | Yes | ✅ analysis, gate, teaser and paywall written; billing unlock = Phase 9 seam |
-| 9 | **Premium:** Best fertility window | 10 | Yes | ⬜ calculator ✅, presentation ⬜ |
-| 10 | **Premium:** Year to conceive — astrology / sports / academic inclinations | 10 | Yes | ⬜ |
-| 11 | "What their cycle says about them" | 10 | Yes | ⬜ |
+| 9 | **Premium:** Best fertility window | 10 | Yes | ✅ `FertilityReadout` — range, uncertainty, three disclaimers, gated |
+| 10 | **Premium:** Year to conceive — astrology / sports / academic inclinations | 10 | Yes | ✅ `Astrology` + `InclinationProfile`, on-device, entertainment label |
+| 11 | "What their cycle says about them" | 10 | Yes | ✅ moon sign + biorhythm, gated, labelled |
 | 12 | Long-term prediction + early warning signs | 8 | No (long-term = Yes) | ✅ engine (`projectNext`, `CycleContext`), six-month card gated on `LONG_HORIZON`, early-signal nudge in the PMS window |
 | 13 | Notifications during / before, time-of-month aware | 8 | No | ✅ `ReminderDecision` policy, channels, boot/timezone rescheduling |
-| 14 | **Premium:** Gym / run intensity by cycle phase | 9 | Yes | ⬜ |
+| 14 | **Premium:** Gym / run intensity by cycle phase | 10 | Yes | ✅ `WorkoutAdvisor` — per-phase intensity + the listen-to-your-body note |
 | 15 | Soft inclusive language, smooth adaptive UI | 2, 12 | No | ✅ design system, ⬜ copy review |
 | 16 | 1-slide chat entry point | 11 | No | ⬜ placeholder screen |
 
@@ -1003,26 +1005,43 @@ feature is silently unavailable — locked means a teaser with a one-tap route t
 
 ---
 
-### Phase 10 — Premium Analyses ⬜ not started
-**Effort:** ~3–4 days · Ready — Phase 9's gate, teaser and paywall are all in place.
+### Phase 10 — Premium Analyses ✅ merged (branch `phase-10-premium-analyses`, PR #12)
+**Effort:** ~3–4 days · Uses Phase 9's gate, teaser and paywall.
 
-- [ ] **Fertility window** — from `CycleCalculator`'s fertile-window output, presented as a range with an explicit
-      uncertainty statement. Must state that it is an estimate, not contraception advice, and not a
-      pregnancy test. Add a "not a medical device" note.
-- [ ] **Workout advisor** — per-phase intensity guidance (e.g. higher-intensity work earlier in
-      the cycle, strength/yoga focus in the luteal phase). Frame as *gentle suggestions* with an
-      explicit "listen to your body" note; never instruct anyone to train through pain.
-- [ ] **Astrology / inclination profiles** (README lines 10 & 11) — deterministic, computed
-      **entirely on-device** from birth date:
-      - natal moon sign, biorhythm phase
-      - "inclination" mapping (study focus, athletic focus) — kept clearly separated from the
-        astrological output
-- [ ] ⚠️ **Hard requirement:** every astrology screen carries a persistent, non-dismissible
-      "for reflection and entertainment only — not medical guidance" label. See R1.
-- [ ] Keep these behind `PremiumGate`.
+- [x] **Fertility window** — `domain/insights/FertilityReadout.kt` turns a `CyclePrediction` into
+      the range plus an uncertainty statement keyed to the measured confidence (HIGH / MEDIUM /
+      LOW each get honest wording), the "wider than one day" note, the context downgrade when the
+      prediction is caveated, and the three required disclaimers: *estimate built from what you
+      log, not contraception advice, not a pregnancy test, not a medical device*. Dates stay dates
+      in the domain; the screen formats them with the shared locale-aware formatter.
+- [x] **Workout advisor** — `domain/wellness/WorkoutAdvisor.kt`: REST / GENTLE / STEADY / PEAK
+      per phase, each a permission rather than an instruction, plus `WorkoutAdvisor.LISTEN_NOTE`
+      rendered under every reading ("…means stop. No phase is worth training through anything").
+      No phase yet answers with "log a period", not a guess. A test asserts no suggestion contains
+      push-through-pain phrasing.
+- [x] **Astrology / inclination profiles** (README lines 10 & 11) — both computed deterministically
+      on-device from the birth date, which is read from and written back to local DataStore
+      (`UserSettings.birthDate`, picked in the Readings screen):
+      - `domain/insight/Astrology.kt` — `natalMoonSign` (mean lunar longitude + first-order
+        equation of centre, well inside a sign's ~30° width) and `biorhythm` (23/28/33-day waves
+        as percentages with plain words);
+      - `domain/insight/InclinationProfile.kt` — a separate type, file and screen section with its
+        own study-focus and athletic-focus lines, never merged into the astrological output.
+- [x] ⚠️ **Hard requirement (R1):** both reflection cards render
+      `Astrology.ENTERTAINMENT_LABEL` ("For reflection and entertainment only — not medical
+      guidance.") inside the card, where it cannot be dismissed or scrolled past. The fertility
+      card carries its medical disclaimer the same way.
+- [x] Behind `PremiumGate` — `ui/screens/ReadingsScreen.kt` puts all four readings behind their own
+      feature gate (`FERTILITY_WINDOW`, `WORKOUT_PLAN`, `PERSONALITY_READING`), reachable from the
+      paywall's "Open the readings" via the `readings` route (like `paywall`, not a tab).
+- [x] Tests: `FertilityReadoutTest` (5) + `WorkoutAdvisorTest` (5) + `AstrologyTest` (6) +
+      `InclinationProfileTest` (4) → **130/130 green**.
 
-**Acceptance:** All premium screens render with the debug unlock; astrology content is
-unambiguously labelled; nothing in this phase sends birth data to any server.
+**Acceptance:** ✅ Every premium screen is gated and unlocks through the Phase 9 debug toggle;
+astrology content is unambiguously labelled in words, in place; nothing in this phase has a network
+path — birth date, cycles and every reading are computed and stored on-device.
+⚠️ Not yet checked by eye: the on-screen rendering with the debug unlock (emulator runs are
+deferred with the rest of the device work, Phase 12 / Q9).
 
 ---
 
@@ -1146,15 +1165,16 @@ State these now so they do not creep in:
 
 ## 14. Where We Are & Next Actions
 
-**Position:** Phases 0–9 merged to `main`. Build green, **110/110 unit tests + 4/4 instrumentation
+**Position:** Phases 0–10 merged to `main`. Build green, **130/130 unit tests + 4/4 instrumentation
 tests**, schema baseline committed, installable APK at
 `app\build\outputs\apk\debug\app-debug.apk` (see `README.md`).
 
 **Next, in order:**
 
-1. **Phase 10 — premium analyses:** fertility window presentation, workout advisor, personality
-   reading — all behind the gate and paywall that now exist.
-2. Then 11 → 12.
+1. **Phase 11 — Firebase Chat:** needs `google-services.json` (Q10); until then the local Room
+   stub stands and `BuildConfig.FIREBASE_CHAT = false`.
+2. Then 12 — accessibility/copy audits, the deferred device tests (Phase 8 firing, Phase 10
+   rendering), Play Store readiness.
 3. Still open across phases: `google-services.json` (Q10 → Phase 11), Phase 0's Firebase/AGP 9
    verification, a review of `ContentLibrary.kt` citations (Q2 → Phase 12), Phase 8's deferred
    on-device firing test (Q9), and real Play Billing behind `BuildConfig.BILLING` (store release).
