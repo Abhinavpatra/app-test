@@ -46,11 +46,11 @@ payments and live chat.
 
 ## 2. Current State — What Actually Exists
 
-The template is gone. This is now a real codebase: **54 Kotlin source files (48 main, 4 unit test,
-2 instrumentation), 57 passing unit tests + 4 passing on-device tests, a Fraunces/Karla type system,
+The template is gone. This is now a real codebase: **67 Kotlin source files (56 main, 9 unit test,
+2 instrumentation), 104 passing unit tests + 4 passing on-device tests, a Fraunces/Karla type system,
 and one merged PR per completed phase.**
 
-### Done (Phases 0–5)
+### Done (Phases 0–8)
 
 | Area | Files |
 |---|---|
@@ -64,8 +64,9 @@ and one merged PR per completed phase.**
 | Persistence | `data/local/{Entities,Daos,Converters,AppDatabase,DatabaseFactory}.kt`, `data/crypto/PassphraseProvider.kt` |
 | Notifications | `notifications/{BloomNotifications,ReminderWorker,ReminderScheduler,ReminderRescheduleReceiver}.kt` + `res/drawable/ic_stat_bloom.xml` |
 | Theme | `ui/theme/{Color,Type,Shape,Motion,Spacing,Theme}.kt` + 7 `res/font/*.ttf` |
-| Shell | `ui/BloomApp.kt`, `ui/navigation/BloomDestination.kt`, `ui/phase/PhaseVisuals.kt` |
-| Components | `ui/components/{Components,Placeholder,DateField}.kt`, `ui/format/DateText.kt` |
+| Shell | `ui/BloomApp.kt`, `ui/navigation/BloomDestination.kt`, `ui/phase/PhaseVisuals.kt`, `ui/SoundEffects.kt` |
+| Components | `ui/components/{Components,Placeholder,DateField,PremiumGate}.kt`, `ui/format/DateText.kt` |
+| Charts | `ui/charts/Charts.kt` — cycle-length line, period-duration bars, phase wheel, symptom heatmap |
 | Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet,CalendarScreen,InsightsScreen}.kt` real; `ChatScreen.kt` placeholder (Phase 11) |
 | Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),CalendarModelTest(17),ChartSeriesTest(13),HomeSummaryTest(8),PeriodEntryRulesTest(7),ReminderDecisionTest(9),InsightsAnalysisTest(5),ReminderRescheduleReceiverTest(3)}.kt` = 104 |
 | Instrumentation | `src/androidTest/.../{DatabasePersistenceTest,MigrationSchemaTest}.kt` (4) |
@@ -88,6 +89,10 @@ One branch → PR → merge per phase, never a direct push to `main`. Pattern:
 | 3 cycle engine | `phase-3-cycle-engine` | #3 ✅ |
 | 4 persistence | `phase-4-persistence` | #4 ✅ |
 | 5 logging flow | `phase-5-logging-flow` | #5 ✅ |
+| UI polish (insets, buttons, scroll sound) | `phase-5-ui-polish` | #6 ✅ |
+| 6 calendar | `phase-6-calendar` | #7 ✅ |
+| 7 insights | `phase-7-insights` | #8 ✅ |
+| 8 remainder (notification policy, boot rescheduling, projection) | `phase-8-remainder` | #9 ✅ |
 
 `origin` = `https://github.com/Abhinavpatra/app-test.git`, `gh` v2.69.0 authenticated as
 `Abhinavpatra`. Run `git log --oneline -10` for the live list.
@@ -620,7 +625,7 @@ Confidence rubric:
 | 5 | Calendar based | 6 | No | ✅ month grid, day sheet, legend, year strip |
 | 6 | Tips for cramps/pain | 8 | No | ✅ `ContentLibrary` |
 | 7 | What literature says about period duration | 8 | No | ✅ `ContentLibrary` (some URLs missing) |
-| 8 | **Premium:** Analysis | 9 | Yes | ⬜ gate ⬜, analysis ⬜ |
+| 8 | **Premium:** Analysis | 9 | Yes | ✅ analysis + gate written (Phase 7); billing-backed unlock = Phase 9 |
 | 9 | **Premium:** Best fertility window | 10 | Yes | ⬜ calculator ✅, presentation ⬜ |
 | 10 | **Premium:** Year to conceive — astrology / sports / academic inclinations | 10 | Yes | ⬜ |
 | 11 | "What their cycle says about them" | 10 | Yes | ⬜ |
@@ -684,7 +689,7 @@ shows in the launcher. ✅ Met.
     injected into `CycleRepositoryImpl`, `ChatRepositoryImpl`, `ReminderWorker`.
 - [x] Enable `buildConfig`; `FIREBASE_CHAT = false` (no API secrets hardcoded).
 - [x] Add `Turbine` + `kotlinx-coroutines-test` to `testImplementation`.
-      ⚠️ Declared but **not yet used by any test** — all 57 tests are synchronous JUnit. Reach for
+      ⚠️ Declared but **not yet used by any test** — all 104 tests are synchronous JUnit. Reach for
       them when `SettingsRepository` (Flow) gets its first test.
 
 **Acceptance:** App builds with all deps resolved; a unit test can inject a fixed `CycleClock` and
@@ -839,7 +844,8 @@ SUCCESSFUL, `tests="4" failures="0"`.
       the home card that says the dates are a rough guide. `predict()` already returns null or
       `isCaveated = true`; nothing must present those dates as settled.
 - [x] Wire `ReminderScheduler`: `BloomApp` reacts to `remindersEnabled` / `reminderHour` /
-      `reminderMinute` and calls `ensureScheduled` or `cancel` — the only caller, so onboarding and
+      `reminderMinute` and calls `ensureScheduled` or `cancel` — the only caller then; from Phase 8
+      log actions and the boot/timezone receiver go through `AppContainer.resyncReminder()` instead.
       Settings only write flags.
 - [x] Unit tests for the two new pure pieces: `HomeSummaryTest` (8) + `PeriodEntryRulesTest` (7).
 
@@ -981,7 +987,7 @@ never blocks a free-tier task; no feature is silently unavailable.
 ---
 
 ### Phase 10 — Premium Analyses ⬜ not started
-**Effort:** ~3–4 days · Blocked on Phase 9's `PremiumGate`.
+**Effort:** ~3–4 days · Blocked on Phase 9's billing seam (`PremiumTeaser` itself shipped in Phase 7).
 
 - [ ] **Fertility window** — from `CycleCalculator`'s fertile-window output, presented as a range with an explicit
       uncertainty statement. Must state that it is an estimate, not contraception advice, and not a
@@ -1046,7 +1052,10 @@ gracefully and never crashes; a reported message is hidden from other users.
 **Effort:** ~4–6 days · **Also carries the Phase 2 accessibility audit and the Phase 8 content copy review.**
 
 - [ ] Full unit + instrumentation test pass; CycleCalculator coverage ≥ 90%.
-      (Unit side: 33 tests exist. Instrumentation side: 0 tests exist.)
+      (Unit side: 104 tests exist; instrumentation side: 4 exist.)
+- [ ] **Phase 8's deferred firing test** — schedule a reminder for now+2 minutes on `Pixel_9`,
+      confirm it posts within a minute, that disabling notifications silences it, and that a
+      timezone change reschedules (Q9, `ReminderSchedulerTest` as instrumentation if useful).
 - [ ] Accessibility audit (TalkBack, large font, contrast, RTL — `supportsRtl` is already `true`).
 - [ ] Tablet/foldable layouts.
 - [ ] Copy review pass for the "soft, inclusive" tone (README line 15) — every string, including
@@ -1075,7 +1084,7 @@ notify → chat without a single crash.
 | **R2** | **Chat safety & moderation.** Anonymous + health-adjacent + global = real abuse risk. | High | App Check, rate limits, report + block flows, moderation rules, and a plan for a human review path. Do not ship chat without the report flow. |
 | **R3** | **Keystore key loss = total data loss.** Screen-lock change, factory reset, or a restore to a new device destroys the key. | High | Exclude DB from backups (§7.3). Warn users in onboarding that data is device-local. Never derive the passphrase from user input — you cannot recover a lost passphrase. Consider an optional user-set PIN as a *second* factor, not the sole key. |
 | **R4** | **Toolchain version churn.** Kotlin 2.2 is EOL; Hilt cannot read Kotlin 2.4 metadata; Room 3 changed packages and artifact IDs; Firebase plugin may lag AGP 9. | High | Skip Hilt (§5.2). Verify Firebase + AGP 9 in Phase 0. Pin all versions in `libs.versions.toml`. Upgrade Kotlin deliberately, not opportunistically. |
-| **R5** | **Timezone / date correctness.** Day-boundary bugs are the classic period-tracker defect, and they silently corrupt every prediction. | High | ISO `String` dates, not epoch millis (§6.2). Injectable `CycleClock`. Tests that cross month/year/leap boundaries. |
+| **R5** | **Timezone / date correctness.** Day-boundary bugs are the classic period-tracker defect, and they silently corrupt every prediction. | High | ISO `String` dates, not epoch millis (§6.2). Injectable `CycleClock`. Tests that cross month/year/leap boundaries. ✅ `ReminderRescheduleReceiver` recomputes the reminder on timezone/clock changes (Phase 8). |
 | **R6** | **Dynamic color fights the brand.** Material You extraction produces arbitrary colors and can wreck phase-specific color coding, which carries real meaning here. ✅ **Mitigated:** the template had `dynamicColor = true`; it is now `false` in `ui/theme/Theme.kt`. | Medium | Keep `dynamicColor = false`. Offer it as an opt-in accessibility setting later — but only if it does not silently override phase colours. |
 | **R7** | **Single-module growth.** ~9 feature packages + domain + data can get unwieldy. | Medium | Deliberate for v1 — Gradle module splits cost real time with one developer. Enforce boundaries with package conventions and ArchUnit-style tests. Split only when build times actually hurt. |
 | **R8** | **Chat + encryption mismatch.** Encrypted local DB + unencrypted server chat is a contradiction users may not understand. | Medium | Onboarding must state plainly what is on-device vs. on-server. Never store chat in the encrypted DB. |
