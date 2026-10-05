@@ -56,10 +56,11 @@ fun PeriodLogSheet(
     onDismiss: () -> Unit,
     onSave: (PeriodEvent) -> Unit,
     existing: PeriodEvent? = null,
+    initialStartDate: CycleDate = today,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var startDate by remember { mutableStateOf(existing?.startDate ?: today) }
+    var startDate by remember { mutableStateOf(existing?.startDate ?: initialStartDate) }
     var endDate by remember { mutableStateOf(existing?.endDate) }
     var flow by remember { mutableStateOf(existing?.flow) }
     var notes by remember { mutableStateOf(existing?.notes.orEmpty()) }
