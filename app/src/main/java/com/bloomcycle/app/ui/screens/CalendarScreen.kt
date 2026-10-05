@@ -163,6 +163,8 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                 container.cycleRepository.updatePeriod(event)
                 snackbarHostState.showSnackbar("Period updated")
             }
+            // The prediction moved, so the daily reminder follows it.
+            container.resyncReminder()
             periodSheetDay = null
             editingPeriod = null
         }
