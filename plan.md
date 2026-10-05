@@ -841,22 +841,28 @@ immediately; all logged data survives process death.
 
 ---
 
-### Phase 6 — Calendar ⬜ not started
+### Phase 6 - Calendar ✅ merged (branch `phase-6-calendar`, PR #7)
 **Effort:** ~3–4 days
 
 > Pre-work already on `main`: `ui/screens/CalendarScreen.kt` placeholder; `PhaseVisuals` gives each
 > phase its colour + glyph; the design system has `Hairline`, `Gap`, `SoftCard` to build on.
 
-- [ ] Month grid: period days, predicted days, fertile window, today — **visually distinguishable
+- [x] Month grid: period days, predicted days, fertile window, today — **visually distinguishable
       without relying on colour alone** (pattern/dot density + labels).
-- [ ] Swipe month-to-month, tap day → day detail sheet.
-- [ ] Log directly from a calendar day.
-- [ ] "Why am I seeing this?" legend — important, since predictions and actuals look similar.
-- [ ] Logged-outside-expected-range indicator (gentle, non-alarming).
-- [ ] Year overview strip.
+- [x] Swipe month-to-month, tap day → day detail sheet.
+- [x] Log directly from a calendar day.
+- [x] "Why am I seeing this?" legend — important, since predictions and actuals look similar.
+- [x] Logged-outside-expected-range indicator (gentle, non-alarming).
+- [x] Year overview strip.
 
 **Acceptance:** A full year renders correctly including month boundaries and leap years; every day
 is tappable; predictions are visually distinct from logged days; works at all supported font scales.
+
+**Delivered:** `domain/calendar/CalendarModel.kt` (pure: month matrix with locale week start, day
+classification, phase resolution) + `ui/screens/CalendarScreen.kt` (HorizontalPager, day sheet,
+legend, year strip) + `PeriodLogSheet(initialStartDate)` so a calendar day seeds the log entry.
+Shape-first marks, never colour-only; every mark also spoken for TalkBack.
+Tests: `CalendarModelTest` (17) — leap years, 365-day year walk, window edges, out-of-range flag.
 
 ---
 
@@ -1082,14 +1088,15 @@ State these now so they do not creep in:
 
 ## 14. Where We Are & Next Actions
 
-**Position:** Phases 0–5 merged to `main`. Build green, **57/57 unit tests + 4/4 instrumentation
+**Position:** Phases 0–6 merged to `main`. Build green, **74/74 unit tests + 4/4 instrumentation
 tests**, schema baseline committed, installable APK at
 `app\build\outputs\apk\debug\app-debug.apk` (see `README.md`).
 
 **Next, in order:**
 
-1. **Phase 6 — Calendar:** put logged periods on a calendar, day-tap logging, month navigation.
-2. Then 7 (Insights) → 8 remainder → 9 → 10 → 11 → 12, in that order.
+1. **Phase 7 — Insights:** hand-drawn Canvas charts, `InsightsAnalysis`, premium gate on the
+   advanced charts (free tier keeps at least one).
+2. Then 8 remainder → 9 → 10 → 11 → 12, in that order.
 3. Still open across phases: `google-services.json` (Q10 → Phase 11), Phase 0's Firebase/AGP 9
    verification, and a review of `ContentLibrary.kt` citations (Q2 → Phase 12).
 
