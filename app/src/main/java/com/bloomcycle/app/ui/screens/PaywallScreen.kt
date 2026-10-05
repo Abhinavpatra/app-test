@@ -21,11 +21,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloomcycle.app.domain.model.EntitlementState
 import com.bloomcycle.app.domain.model.PremiumFeature
+import com.bloomcycle.app.ui.LocalNavController
 import com.bloomcycle.app.ui.components.Gap
 import com.bloomcycle.app.ui.components.PrimaryButton
 import com.bloomcycle.app.ui.components.PremiumBadge
 import com.bloomcycle.app.ui.components.SectionHeader
 import com.bloomcycle.app.ui.components.SoftCard
+import com.bloomcycle.app.ui.navigation.BloomDestination
 import com.bloomcycle.app.ui.rememberAppContainer
 import com.bloomcycle.app.ui.theme.Spacing
 import kotlinx.coroutines.launch
@@ -47,6 +49,7 @@ fun PaywallScreen(
 ) {
     val container = rememberAppContainer()
     val scope = rememberCoroutineScope()
+    val navController = LocalNavController.current
     val entitlements by container.entitlements.state
         .collectAsStateWithLifecycle(initialValue = EntitlementState())
     val unlocked = entitlements.isDebugUnlocked || entitlements.unlocked.isNotEmpty()
@@ -93,6 +96,14 @@ fun PaywallScreen(
                     },
                 )
             }
+
+            // The readings are one tap away whether or not anything is unlocked yet — each
+            // section gates itself, so this is never a dead end.
+            PrimaryButton(
+                text = "Open the readings",
+                onClick = { navController?.navigate(BloomDestination.READINGS) },
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             SoftCard(modifier = Modifier.fillMaxWidth()) {
                 Text(

@@ -28,9 +28,12 @@ enum class BloomDestination(
         val start: BloomDestination = Home
 
         /**
-         * Not a tab — a screen opened from a teaser or Settings, and back-button-dismissed.
-         * Kept out of the enum so the navigation bar never grows a sixth item.
+         * Not a tab — a screen opened from a teaser, the paywall or Settings, and
+         * back-button-dismissed. Kept out of the enum so the navigation bar never grows.
          */
         const val PAYWALL = "paywall"
+
+        /** The Phase 10 premium readings; same rules as [PAYWALL]. */
+        const val READINGS = "readings"
     }
 }
