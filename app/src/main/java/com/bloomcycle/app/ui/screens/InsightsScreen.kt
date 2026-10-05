@@ -19,7 +19,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,17 +43,19 @@ import com.bloomcycle.app.domain.model.CyclePrediction
 import com.bloomcycle.app.domain.model.PremiumFeature
 import com.bloomcycle.app.domain.model.UserSettings
 import com.bloomcycle.app.core.time.CycleDate
+import com.bloomcycle.app.ui.LocalNavController
 import com.bloomcycle.app.ui.charts.CycleLengthChart
 import com.bloomcycle.app.ui.charts.PeriodDurationChart
 import com.bloomcycle.app.ui.charts.PhaseWheel
 import com.bloomcycle.app.ui.charts.SymptomHeatmapChart
 import com.bloomcycle.app.ui.components.Gap
 import com.bloomcycle.app.ui.components.PremiumBadge
-import com.bloomcycle.app.ui.components.PremiumTeaser
+import com.bloomcycle.app.ui.components.PremiumGate
 import com.bloomcycle.app.ui.components.SectionHeader
 import com.bloomcycle.app.ui.components.SoftCard
 import com.bloomcycle.app.ui.format.formatDate
 import com.bloomcycle.app.ui.format.formatHeadingDate
+import com.bloomcycle.app.ui.navigation.BloomDestination
 import com.bloomcycle.app.ui.phase.PhaseVisual
 import com.bloomcycle.app.ui.rememberAppContainer
 import com.bloomcycle.app.ui.theme.ArticleStyle
@@ -64,7 +65,6 @@ import com.bloomcycle.app.ui.theme.Bloom
 import com.bloomcycle.app.domain.model.PhaseType
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
 
 /**
  * Phase 7. Charts are hand-drawn Compose Canvas — no chart library — and every one carries a
@@ -77,7 +77,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun InsightsScreen(modifier: Modifier = Modifier) {
     val container = rememberAppContainer()
-    val scope = rememberCoroutineScope()
     val today = remember(container) { container.cycleClock.today() }
 
     var settings by remember { mutableStateOf<UserSettings?>(null) }
@@ -118,14 +117,11 @@ fun InsightsScreen(modifier: Modifier = Modifier) {
     val wheel = remember(cycles, prediction) { phaseWheel(cycles, prediction) }
 
     val analysisUnlocked = entitlements?.isUnlocked(PremiumFeature.ANALYSIS) == true
-    val unlockAnalysis: () -> Unit = {
-        scope.launch { container.entitlements.unlock(PremiumFeature.ANALYSIS) }
-    }
-
     val longHorizonUnlocked = entitlements?.isUnlocked(PremiumFeature.LONG_HORIZON) == true
-    val unlockLongHorizon: () -> Unit = {
-        scope.launch { container.entitlements.unlock(PremiumFeature.LONG_HORIZON) }
-    }
+    // Locked charts open the paywall (Phase 9) instead of unlocking themselves, so the
+    // price, the wording and the "tracking stays free" line live in exactly one place.
+    val navController = LocalNavController.current
+    val openPaywall: () -> Unit = { navController?.navigate(BloomDestination.PAYWALL) }
 
     Scaffold(modifier = modifier) { padding ->
         Column(
@@ -191,10 +187,12 @@ fun InsightsScreen(modifier: Modifier = Modifier) {
                     caption = wheelCaption(wheel),
                     locked = !analysisUnlocked,
                 ) {
-                    if (analysisUnlocked) {
+                    PremiumGate(
+                        feature = PremiumFeature.ANALYSIS,
+                        unlocked = analysisUnlocked,
+                        onOpenPaywall = openPaywall,
+                    ) {
                         PhaseWheel(segments = wheel)
-                    } else {
-                        PremiumTeaser(feature = PremiumFeature.ANALYSIS, onUnlock = unlockAnalysis)
                     }
                 }
 
@@ -207,10 +205,12 @@ fun InsightsScreen(modifier: Modifier = Modifier) {
                     },
                     locked = !analysisUnlocked,
                 ) {
-                    if (analysisUnlocked) {
+                    PremiumGate(
+                        feature = PremiumFeature.ANALYSIS,
+                        unlocked = analysisUnlocked,
+                        onOpenPaywall = openPaywall,
+                    ) {
                         Text(text = report.summary, style = ArticleStyle)
-                    } else {
-                        PremiumTeaser(feature = PremiumFeature.ANALYSIS, onUnlock = unlockAnalysis)
                     }
                 }
 
@@ -226,15 +226,14 @@ fun InsightsScreen(modifier: Modifier = Modifier) {
                         },
                         locked = !longHorizonUnlocked,
                     ) {
-                        if (longHorizonUnlocked) {
+                        PremiumGate(
+                            feature = PremiumFeature.LONG_HORIZON,
+                            unlocked = longHorizonUnlocked,
+                            onOpenPaywall = openPaywall,
+                        ) {
                             ProjectionList(
                                 dates = predicted.projectNext(months = 6),
                                 cycleLength = predicted.averageCycleLength,
-                            )
-                        } else {
-                            PremiumTeaser(
-                                feature = PremiumFeature.LONG_HORIZON,
-                                onUnlock = unlockLongHorizon,
                             )
                         }
                     }

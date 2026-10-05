@@ -1,15 +1,18 @@
 package com.bloomcycle.app
 
 import android.content.Context
+import com.bloomcycle.app.BuildConfig
 import com.bloomcycle.app.core.time.CycleClock
 import com.bloomcycle.app.core.time.SystemCycleClock
 import com.bloomcycle.app.data.crypto.PassphraseProvider
 import com.bloomcycle.app.data.local.DatabaseFactory
+import com.bloomcycle.app.data.repo.BillingEntitlementRepository
 import com.bloomcycle.app.data.repo.ChatRepositoryImpl
 import com.bloomcycle.app.data.repo.ContentRepositoryImpl
 import com.bloomcycle.app.data.repo.CycleRepositoryImpl
 import com.bloomcycle.app.data.repo.EntitlementRepositoryImpl
 import com.bloomcycle.app.data.repo.SettingsRepositoryImpl
+import com.bloomcycle.app.domain.repository.EntitlementRepository
 import com.bloomcycle.app.notifications.ReminderScheduler
 import kotlinx.coroutines.flow.first
 
@@ -31,7 +34,12 @@ class AppContainer(context: Context) {
     val database by lazy { DatabaseFactory(appContext, passphraseProvider).create() }
 
     val settings: SettingsRepositoryImpl by lazy { SettingsRepositoryImpl(appContext) }
-    val entitlements: EntitlementRepositoryImpl by lazy { EntitlementRepositoryImpl(appContext) }
+
+    /** See [BillingEntitlementRepository] — `BuildConfig.BILLING` picks the implementation. */
+    val entitlements: EntitlementRepository by lazy {
+        val local = EntitlementRepositoryImpl(appContext)
+        if (BuildConfig.BILLING) BillingEntitlementRepository(local) else local
+    }
 
     val cycleRepository: CycleRepositoryImpl by lazy {
         CycleRepositoryImpl(database.periodEventDao(), database.symptomLogDao(), cycleClock)

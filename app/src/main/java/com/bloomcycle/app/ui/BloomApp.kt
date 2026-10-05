@@ -16,8 +16,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -30,8 +32,16 @@ import com.bloomcycle.app.ui.screens.ChatScreen
 import com.bloomcycle.app.ui.screens.HomeScreen
 import com.bloomcycle.app.ui.screens.InsightsScreen
 import com.bloomcycle.app.ui.screens.OnboardingScreen
+import com.bloomcycle.app.ui.screens.PaywallScreen
 import com.bloomcycle.app.ui.screens.SettingsScreen
 import com.bloomcycle.app.ui.theme.BloomMotion
+
+/**
+ * The nav controller, published so a screen that is not a tab — the paywall — can be opened
+ * from anywhere (a locked chart, Settings) without threading a callback through five layers
+ * of parameters. `null` outside [BloomNavigation]; callers must be null-safe.
+ */
+val LocalNavController = staticCompositionLocalOf<NavController?> { null }
 
 /**
  * App shell.
@@ -122,19 +132,24 @@ private fun BloomNavigation() {
     ) {
         // NavigationSuiteScaffold measures content into whatever space the navigation
         // component leaves, so it needs no PaddingValues of its own.
-        NavHost(
-            navController = navController,
-            startDestination = BloomDestination.start.route,
-            enterTransition = { fadeIn(tween(BloomMotion.Default.durationBase)) },
-            exitTransition = { fadeOut(tween(BloomMotion.Default.durationQuick)) },
-            popEnterTransition = { fadeIn(tween(BloomMotion.Default.durationBase)) },
-            popExitTransition = { fadeOut(tween(BloomMotion.Default.durationQuick)) },
-        ) {
-            composable(BloomDestination.Home.route) { HomeScreen() }
-            composable(BloomDestination.Calendar.route) { CalendarScreen() }
-            composable(BloomDestination.Insights.route) { InsightsScreen() }
-            composable(BloomDestination.Chat.route) { ChatScreen() }
-            composable(BloomDestination.Settings.route) { SettingsScreen() }
+        CompositionLocalProvider(LocalNavController provides navController) {
+            NavHost(
+                navController = navController,
+                startDestination = BloomDestination.start.route,
+                enterTransition = { fadeIn(tween(BloomMotion.Default.durationBase)) },
+                exitTransition = { fadeOut(tween(BloomMotion.Default.durationQuick)) },
+                popEnterTransition = { fadeIn(tween(BloomMotion.Default.durationBase)) },
+                popExitTransition = { fadeOut(tween(BloomMotion.Default.durationQuick)) },
+            ) {
+                composable(BloomDestination.Home.route) { HomeScreen() }
+                composable(BloomDestination.Calendar.route) { CalendarScreen() }
+                composable(BloomDestination.Insights.route) { InsightsScreen() }
+                composable(BloomDestination.Chat.route) { ChatScreen() }
+                composable(BloomDestination.Settings.route) { SettingsScreen() }
+                composable(BloomDestination.PAYWALL) {
+                    PaywallScreen(onBack = { navController.popBackStack() })
+                }
+            }
         }
     }
 }

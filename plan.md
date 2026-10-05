@@ -1,8 +1,8 @@
 # Implementation Plan — Period Tracking App ("Bloom")
 
-Status: **in progress.** Phases 0–8 merged to `main` (Phases 5–8 delivered logging, calendar,
-insights and the notification policy; **104 unit + 4 instrumentation tests** green).
-Phases 9–12 not started.
+Status: **in progress.** Phases 0–9 merged to `main` (Phases 5–9 delivered logging, calendar,
+insights, the notification policy and the premium seam; **110 unit + 4 instrumentation tests** green).
+Phases 10–12 not started.
 Last reviewed: 2026-10-05
 Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 
@@ -10,9 +10,10 @@ Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 push → open PR with `gh` → merge into `main` → delete the branch. Never push directly to `main`.
 
 **Verified green:**
-- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **104/104 unit tests**
+- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **110/110 unit tests**
   (CycleCalculator 31, PhaseResolver 11, CalendarModel 17, ChartSeries 13, HomeSummary 8,
-  PeriodEntryRules 7, ReminderDecision 9, InsightsAnalysis 5, ReminderRescheduleReceiver 3).
+  PeriodEntryRules 7, ReminderDecision 9, EntitlementState 6, InsightsAnalysis 5,
+  ReminderRescheduleReceiver 3).
 - `.\gradlew.bat :app:connectedDebugAndroidTest` on emulator `Pixel_9` → **4/4 instrumentation tests**
   (plaintext-canary, fresh reopen, schema create, live-schema-vs-JSON).
 
@@ -37,7 +38,8 @@ Recommended sequencing, in priority order (phase numbers match §10):
 5. ✅ **Calendar + insights** (Phases 6–7). The rest of the loop: logged periods on a calendar, charts.
 6. ✅ **Content, projections & notification policy** (Phase 8). Curated content library, the pure
    reminder decision (early-signal nudges, boot/timezone rescheduling), the six-month projection.
-7. Everything else in the README is layered on top of that loop.
+7. ✅ **Entitlements & paywall** (Phase 9). The billing seam, the paywall screen, the debug unlock.
+8. Everything else in the README is layered on top of that loop.
 
 Estimated solo build: **6–8 weeks** to a shippable v1 covering all README features except real
 payments and live chat.
@@ -46,11 +48,11 @@ payments and live chat.
 
 ## 2. Current State — What Actually Exists
 
-The template is gone. This is now a real codebase: **67 Kotlin source files (56 main, 9 unit test,
-2 instrumentation), 104 passing unit tests + 4 passing on-device tests, a Fraunces/Karla type system,
+The template is gone. This is now a real codebase: **70 Kotlin source files (58 main, 10 unit test,
+2 instrumentation), 110 passing unit tests + 4 passing on-device tests, a Fraunces/Karla type system,
 and one merged PR per completed phase.**
 
-### Done (Phases 0–8)
+### Done (Phases 0–9)
 
 | Area | Files |
 |---|---|
@@ -62,13 +64,14 @@ and one merged PR per completed phase.**
 | Repositories | `domain/repository/Repositories.kt` + `data/repo/{Cycle,Settings,Entitlement,Chat,Content}RepositoryImpl.kt` |
 | Content | `domain/content/ContentLibrary.kt` — ~15 curated, cited items |
 | Persistence | `data/local/{Entities,Daos,Converters,AppDatabase,DatabaseFactory}.kt`, `data/crypto/PassphraseProvider.kt` |
+| Entitlements | `data/repo/{EntitlementRepositoryImpl,BillingEntitlementRepository}.kt` — seam picked by `BuildConfig.BILLING` |
 | Notifications | `notifications/{BloomNotifications,ReminderWorker,ReminderScheduler,ReminderRescheduleReceiver}.kt` + `res/drawable/ic_stat_bloom.xml` |
 | Theme | `ui/theme/{Color,Type,Shape,Motion,Spacing,Theme}.kt` + 7 `res/font/*.ttf` |
 | Shell | `ui/BloomApp.kt`, `ui/navigation/BloomDestination.kt`, `ui/phase/PhaseVisuals.kt`, `ui/SoundEffects.kt` |
 | Components | `ui/components/{Components,Placeholder,DateField,PremiumGate}.kt`, `ui/format/DateText.kt` |
 | Charts | `ui/charts/Charts.kt` — cycle-length line, period-duration bars, phase wheel, symptom heatmap |
-| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet,CalendarScreen,InsightsScreen}.kt` real; `ChatScreen.kt` placeholder (Phase 11) |
-| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),CalendarModelTest(17),ChartSeriesTest(13),HomeSummaryTest(8),PeriodEntryRulesTest(7),ReminderDecisionTest(9),InsightsAnalysisTest(5),ReminderRescheduleReceiverTest(3)}.kt` = 104 |
+| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet,CalendarScreen,InsightsScreen,PaywallScreen}.kt` real; `ChatScreen.kt` placeholder (Phase 11) |
+| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),CalendarModelTest(17),ChartSeriesTest(13),HomeSummaryTest(8),PeriodEntryRulesTest(7),ReminderDecisionTest(9),EntitlementStateTest(6),InsightsAnalysisTest(5),ReminderRescheduleReceiverTest(3)}.kt` = 110 |
 | Instrumentation | `src/androidTest/.../{DatabasePersistenceTest,MigrationSchemaTest}.kt` (4) |
 | Schema baseline | `app/schemas/com.bloomcycle.app.data.local.AppDatabase/1.json` |
 
@@ -93,6 +96,8 @@ One branch → PR → merge per phase, never a direct push to `main`. Pattern:
 | 6 calendar | `phase-6-calendar` | #7 ✅ |
 | 7 insights | `phase-7-insights` | #8 ✅ |
 | 8 remainder (notification policy, boot rescheduling, projection) | `phase-8-remainder` | #9 ✅ |
+| plan sync (docs) | `plan-sync-6-8` | #10 ✅ |
+| 9 entitlements & paywall | `phase-9-entitlements` | #11 ✅ |
 
 `origin` = `https://github.com/Abhinavpatra/app-test.git`, `gh` v2.69.0 authenticated as
 `Abhinavpatra`. Run `git log --oneline -10` for the live list.
@@ -168,7 +173,7 @@ com.bloomcycle.app/
 ├── data/
 │   ├── crypto/                    ✅ PassphraseProvider.kt
 │   ├── local/                     ✅ Entities, Daos, Converters, AppDatabase, DatabaseFactory
-│   ├── repo/                      ✅ Cycle, Settings, Entitlement, Chat, Content impls
+│   ├── repo/                      ✅ Cycle, Settings, Entitlement (+ billing seam), Chat, Content impls
 │   ├── settings/                  ⏳ DataStore-backed SettingsRepositoryImpl lives in data/repo today
 │   └── remote/                    ⏳ FirebaseAuthDataSource, FirestoreChatDataSource, DTOs
 │
@@ -179,10 +184,10 @@ com.bloomcycle.app/
 │   ├── theme/                     ✅ Color, Type, Shape, Motion, Spacing, Theme   (= planned core/design/)
 │   ├── navigation/                ✅ BloomDestination.kt
 │   ├── phase/                     ✅ PhaseVisuals.kt
-│   ├── components/                ✅ Components.kt, Placeholder.kt, DateField.kt
+│   ├── components/                ✅ Components.kt, Placeholder.kt, DateField.kt, PremiumGate.kt
 │   ├── format/                     ✅ DateText.kt (date copy + picker conversion)
 │   ├── screens/                   ✅ Home, Settings, Onboarding, PeriodLogSheet, SymptomLogSheet
-│   │                               ✅ Calendar, Insights   ⏳ Chat (placeholder)
+│   │                               ✅ Calendar, Insights, Paywall   ⏳ Chat (placeholder)
 │   ├── AppContainer.kt             ✅ LocalAppContainer + rememberAppContainer()
 │   └── BloomApp.kt                ✅ NavHost, onboarding gate, reminder scheduling
 │
@@ -625,7 +630,7 @@ Confidence rubric:
 | 5 | Calendar based | 6 | No | ✅ month grid, day sheet, legend, year strip |
 | 6 | Tips for cramps/pain | 8 | No | ✅ `ContentLibrary` |
 | 7 | What literature says about period duration | 8 | No | ✅ `ContentLibrary` (some URLs missing) |
-| 8 | **Premium:** Analysis | 9 | Yes | ✅ analysis + gate written (Phase 7); billing-backed unlock = Phase 9 |
+| 8 | **Premium:** Analysis | 9 | Yes | ✅ analysis, gate, teaser and paywall written; billing unlock = Phase 9 seam |
 | 9 | **Premium:** Best fertility window | 10 | Yes | ⬜ calculator ✅, presentation ⬜ |
 | 10 | **Premium:** Year to conceive — astrology / sports / academic inclinations | 10 | Yes | ⬜ |
 | 11 | "What their cycle says about them" | 10 | Yes | ⬜ |
@@ -956,38 +961,50 @@ Phase 12, with the phases that need a device.
 
 ---
 
-### Phase 9 — Entitlements & Paywall ⚠️ ~45% done
+### Phase 9 — Entitlements & Paywall ✅ merged (branch `phase-9-entitlements`, PR #11)
 **Effort:** ~2 days
 
 - [x] `domain/repository/EntitlementRepository.kt` — interface + `PremiumFeature` enum +
-      `EntitlementState` (with `isDebugUnlocked`) already written:
+      `EntitlementState` (with `isDebugUnlocked`) — written in Phase 3, unchanged:
   ```kotlin
   enum class PremiumFeature { ANALYSIS, FERTILITY_WINDOW, LONG_HORIZON, WORKOUT_PLAN, PERSONALITY_READING }
   interface EntitlementRepository {
       val state: Flow<EntitlementState>
-      fun isUnlocked(feature: PremiumFeature): Boolean
-      suspend fun unlock(feature: PremiumFeature)   // stub
+      suspend fun isUnlocked(feature: PremiumFeature): Boolean
+      suspend fun unlock(feature: PremiumFeature)
+      suspend fun setDebugUnlocked(unlocked: Boolean)
   }
   ```
-- [x] `LocalEntitlementRepository` → **renamed `data/repo/EntitlementRepositoryImpl.kt`** with DataStore
-      persistence (`unlocked_features`, `debug_unlock_all`) — ✅ written, and `InsightsScreen` already
-      reads it. Still open: the **debug-only unlock toggle in a developer settings screen**.
-- [x] `ui/components/PremiumGate.kt` — `PremiumTeaser(feature, onUnlock)` tasteful teaser card,
-      written in Phase 7 and used on Insights for `ANALYSIS` and (Phase 8) `LONG_HORIZON`.
-      Still open: a generic `PremiumGate(feature) { ... }` wrapper so every other screen gets one
-      call site instead of hand-rolling the lock.
-- [ ] `ui/screens` paywall — soft, non-pressuring copy. No dark patterns, no fake countdowns, no
-      fake "47 people viewing". Play Store policy risk (R2). Not written.
-- [ ] Add the billing seam: a `BillingEntitlementRepository` stub with the same interface, and a
-      TODO for Play Billing or RevenueCat. Not written.
+- [x] `data/repo/EntitlementRepositoryImpl.kt` — DataStore persistence (`unlocked_features`,
+      `debug_unlock_all`), read by Insights, Settings and the paywall.
+- [x] `ui/components/PremiumGate.kt` — `PremiumGate(feature, unlocked, onOpenPaywall) { content }`
+      is now the single call site for a gated feature (Insights uses it for the ring, the written
+      reading and the projection); `PremiumTeaser` opens the paywall, and its copy no longer claims
+      a purchase it has not made.
+- [x] `ui/screens/PaywallScreen.kt` — soft, non-pressuring copy: free tier stated first, all five
+      features listed with their real descriptions and unlockable one at a time; no countdown, no
+      fake scarcity, no subscription framing; says plainly that v1 takes no payment (risk R2).
+      Reached from any teaser or Settings, back-dismissed — `BloomDestination.PAYWALL` is a route,
+      not a tab, published through `LocalNavController`.
+- [x] **Debug toggle in a developer settings screen** — Settings shows a `BuildConfig.DEBUG`
+      "Unlock everything" switch (`setDebugUnlocked`), so every premium screen is testable without
+      tapping each unlock; it cannot appear in a release build.
+- [x] **Billing seam** — `data/repo/BillingEntitlementRepository.kt` wraps the local store behind
+      the same interface, with the `queryPurchasesAsync` / `launchBillingFlow` work marked TODO;
+      the new `BuildConfig.BILLING` field (initially `false`) picks it in `AppContainer`.
+- [x] Tests: `EntitlementStateTest` (6) — default lock, per-feature independence, the debug
+      override, and that every feature carries a title/blurb and the paywall lists exactly the five
+      planned ones → **110/110 green**.
 
-**Acceptance:** Every Premium feature is reachable for testing via the debug toggle; the paywall
-never blocks a free-tier task; no feature is silently unavailable.
+**Acceptance:** ✅ Every Premium feature is reachable for testing via the debug toggle; the paywall
+never blocks a free-tier task (tracking, calendar, charts and reminders carry no gate at all); no
+feature is silently unavailable — locked means a teaser with a one-tap route to the paywall.
+⚠️ Deferred: real Play Billing. v1 unlocks are stored locally and the paywall says so.
 
 ---
 
 ### Phase 10 — Premium Analyses ⬜ not started
-**Effort:** ~3–4 days · Blocked on Phase 9's billing seam (`PremiumTeaser` itself shipped in Phase 7).
+**Effort:** ~3–4 days · Ready — Phase 9's gate, teaser and paywall are all in place.
 
 - [ ] **Fertility window** — from `CycleCalculator`'s fertile-window output, presented as a range with an explicit
       uncertainty statement. Must state that it is an estimate, not contraception advice, and not a
@@ -1129,17 +1146,17 @@ State these now so they do not creep in:
 
 ## 14. Where We Are & Next Actions
 
-**Position:** Phases 0–8 merged to `main`. Build green, **104/104 unit tests + 4/4 instrumentation
+**Position:** Phases 0–9 merged to `main`. Build green, **110/110 unit tests + 4/4 instrumentation
 tests**, schema baseline committed, installable APK at
 `app\build\outputs\apk\debug\app-debug.apk` (see `README.md`).
 
 **Next, in order:**
 
-1. **Phase 9 — entitlements & paywall:** billing-backed unlock path (the UI gate itself exists:
-   `PremiumGate.kt`, `PremiumTeaser`, per-feature `isUnlocked`/`unlock`).
-2. Then 10 → 11 → 12, in that order.
+1. **Phase 10 — premium analyses:** fertility window presentation, workout advisor, personality
+   reading — all behind the gate and paywall that now exist.
+2. Then 11 → 12.
 3. Still open across phases: `google-services.json` (Q10 → Phase 11), Phase 0's Firebase/AGP 9
-   verification, a review of `ContentLibrary.kt` citations (Q2 → Phase 12), and Phase 8's deferred
-   on-device firing test (Q9).
+   verification, a review of `ContentLibrary.kt` citations (Q2 → Phase 12), Phase 8's deferred
+   on-device firing test (Q9), and real Play Billing behind `BuildConfig.BILLING` (store release).
 
 **Branch/PR discipline:** one branch per phase, never push to `main`, commit messages **4–15 words**.

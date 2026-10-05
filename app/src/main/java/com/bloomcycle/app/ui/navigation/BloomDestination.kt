@@ -26,5 +26,11 @@ enum class BloomDestination(
 
     companion object {
         val start: BloomDestination = Home
+
+        /**
+         * Not a tab — a screen opened from a teaser or Settings, and back-button-dismissed.
+         * Kept out of the enum so the navigation bar never grows a sixth item.
+         */
+        const val PAYWALL = "paywall"
     }
 }
