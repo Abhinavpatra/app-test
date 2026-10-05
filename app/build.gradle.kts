@@ -5,6 +5,17 @@ plugins {
     alias(libs.plugins.room3)
 }
 
+// The google-services plugin is on the classpath via the root `apply false` declaration
+// but is only applied when the config file exists. Fresh clones without
+// google-services.json (gitignored, plan.md §5.3) must still build: chat then falls
+// back to the in-memory repository and FIREBASE_CHAT stays false.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
+// Mirrors the plugin condition above: true exactly when the google-services plugin runs.
+val hasFirebaseConfig = file("google-services.json").exists()
+
 // Exports the schema JSON next to the code that owns it. Without this there is no
 // baseline to migrate from, so any future entity change is an untested destructive
 // migration (plan.md §6.3).
@@ -27,7 +38,10 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("boolean", "FIREBASE_CHAT", "false")
+        // True exactly when the google-services plugin is applied above (config file
+        // present). The Firestore chat implementation is chosen behind this flag in
+        // AppContainer; without it the in-memory repository stands in (plan.md Phase 11).
+        buildConfigField("boolean", "FIREBASE_CHAT", hasFirebaseConfig.toString())
         // Selects the billing-backed entitlement repository. v1 is false: no billing SDK
         // ships until the store release (plan.md Phase 9), so the DataStore-backed
         // implementation stands in behind the same interface.
@@ -87,6 +101,18 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.room3.runtime)
     implementation(libs.androidx.sqlcipher)
+
+    // Firebase — Phase 11b. Versions ride the BoM; only the BoM is pinned
+    // (gradle/libs.versions.toml). firebase-auth/firestore are enough for chat.
+    // Both App Check providers are plain `implementation` (not split by variant)
+    // because BloomApplication references both factories and `BuildConfig.DEBUG`
+    // picks which one is installed at runtime.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.appcheck)
+    implementation(libs.firebase.appcheck.debug)
+    implementation(libs.firebase.appcheck.playintegrity)
 
     ksp(libs.androidx.room3.compiler)
 

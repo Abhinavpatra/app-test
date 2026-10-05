@@ -55,6 +55,7 @@ import com.bloomcycle.app.domain.model.ChatBuckets
 import com.bloomcycle.app.domain.model.ChatMessage
 import com.bloomcycle.app.domain.model.ChatScope
 import com.bloomcycle.app.domain.model.UserSettings
+import com.bloomcycle.app.domain.repository.ChatConnection
 import com.bloomcycle.app.ui.PageScrollSound
 import com.bloomcycle.app.ui.components.EmptyState
 import com.bloomcycle.app.ui.components.Gap
@@ -77,10 +78,11 @@ import kotlinx.coroutines.launch
  * leaves the device is built by [ChatIdentityFactory] — a locally generated pseudonym,
  * a coarse phase bucket and a cycle-length band, never a name or a date (plan.md §7.4).
  *
- * Until the Firestore backend exists the repository is the local Room stub, so the room
- * here is honestly empty rather than seeded with invented people; moderation, reporting
- * and blocking are real and local, which is what lets the safety flows be tested before
- * there is a server to enforce them.
+ * When `FIREBASE_CHAT` is true the rooms are Firestore documents shared with
+ * everyone in the same phase bucket; otherwise they are in-memory and local-only.
+ * Either way the room here is honestly empty rather than seeded with invented
+ * people; moderation, reporting and blocking are real and local, which is what
+ * lets the safety flows be tested before there is a server to enforce them.
  */
 @Composable
 fun ChatScreen(modifier: Modifier = Modifier) {
@@ -129,9 +131,15 @@ fun ChatScreen(modifier: Modifier = Modifier) {
     }
 
     var roomScope by rememberSaveable { mutableStateOf(ChatScope.MY_PHASE) }
+    // The repository never learns what a phase means — it just gets a room id, and
+    // two people in the same phase compute the same one (plan.md §7.4).
+    val roomId = remember(phase, roomScope) { ChatBuckets.roomFor(phase, roomScope) }
     val messages by container.chatRepository
-        .messages(roomScope)
+        .messages(roomId)
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    val connection by container.chatRepository
+        .connection(roomId)
+        .collectAsStateWithLifecycle(initialValue = ChatConnection.LIVE)
     val visible = remember(messages, current) {
         ChatVisibility.visible(
             messages = messages,
@@ -170,7 +178,7 @@ fun ChatScreen(modifier: Modifier = Modifier) {
             )
             val payload = ChatModerationPolicy.sanitize(draft)
             scope.launch {
-                container.chatRepository.send(payload, roomScope, identity)
+                container.chatRepository.send(payload, roomId, identity)
                 lastSentAt = Instant.now()
                 draft = ""
             }
@@ -260,6 +268,18 @@ fun ChatScreen(modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (connection == ChatConnection.OFFLINE) {
+                    Gap(Spacing.xs)
+                    Text(
+                        text = "Can't reach the circle right now — showing what is saved " +
+                            "on this device. Your messages will send when you're back.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Offline. Showing saved messages."
+                        },
+                    )
+                }
                 Gap(Spacing.xxs)
                 Text(
                     text = "A pseudonym and a coarse phase label only — never your name, " +

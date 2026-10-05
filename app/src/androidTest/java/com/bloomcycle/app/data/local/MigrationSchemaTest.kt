@@ -1,6 +1,5 @@
 package com.bloomcycle.app.data.local
 
-import androidx.room3.migration.Migration
 import androidx.room3.testing.MigrationTestHelper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -17,10 +16,10 @@ import org.junit.runner.RunWith
 /**
  * Guards plan.md §6.3: the exported schema in `app/schemas/` is a real, usable baseline.
  *
- * Version 1 has no migrations to run — the point of these tests is that the harness
- * *works* today, so the first real migration is not also the first time
- * `MigrationTestHelper` is exercised. Add a `migration_1_to_2_*` test the moment the
- * schema changes; never bump `AppDatabase.version` without one.
+ * The harness was proven at version 1, so the first real migration (1 → 2, dropping
+ * the local chat table for Phase 11b) is not also the first time
+ * `MigrationTestHelper` is exercised. Never bump `AppDatabase.version` without a
+ * matching `migration_*` test here.
  *
  * The helper is driven through the production SQLCipher driver rather than a plain
  * SQLite one, so a migration is validated against the same stack the app actually runs.
@@ -74,8 +73,50 @@ class MigrationSchemaTest {
     fun the_live_schema_matches_the_exported_json() {
         runBlocking {
             helper.createDatabase(1)
-            // No migrations to apply at v1 — this validates the current schema against the JSON.
-            helper.runMigrationsAndValidate(1, emptyList<Migration>())
+            // Migrates to the current version and validates against the exported JSON.
+            helper.runMigrationsAndValidate(2, listOf(AppDatabase.MIGRATION_1_2))
+        }
+    }
+
+    /**
+     * Phase 11b: the local chat table goes away — messages live in Firestore now and
+     * must never sit in the encrypted store beside health data (plan.md §7.4).
+     * Anything unsent in the local rooms is discarded by the drop.
+     */
+    @Test
+    fun migration_1_to_2_drops_the_local_chat_table_but_keeps_periods() {
+        runBlocking {
+            val connection = helper.createDatabase(1)
+
+            connection
+                .prepare(
+                    "INSERT INTO chat_messages " +
+                        "(id, text, authorName, phaseBucket, isOwn, createdAt, scope) " +
+                        "VALUES ('m1', 'hello', 'Quiet Fern', 'near ovulation', 1, 0, 'GLOBAL')",
+                )
+                .use { it.step() }
+            connection
+                .prepare(
+                    "INSERT INTO period_events (startDate, isSpottingOnly, createdAt, updatedAt) " +
+                        "VALUES ('2026-10-02', 0, 0, 0)",
+                )
+                .use { it.step() }
+
+            val migrated = helper.runMigrationsAndValidate(2, listOf(AppDatabase.MIGRATION_1_2))
+
+            migrated
+                .prepare(
+                    "SELECT name FROM sqlite_master " +
+                        "WHERE type = 'table' AND name = 'chat_messages'",
+                )
+                .use { statement ->
+                    assertEquals(false, statement.step())
+                }
+            migrated.prepare("SELECT COUNT(*) FROM period_events").use { statement ->
+                statement.step()
+                assertEquals(1, statement.getInt(0))
+            }
+            // Left open on purpose: MigrationTestHelper closes what it hands out when the rule ends.
         }
     }
 

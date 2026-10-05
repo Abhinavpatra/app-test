@@ -26,6 +26,6 @@ debug key, so it installs straight onto a device — with one plugged in:
 
 Or just copy that `.apk` to the phone and open it (allow "install unknown apps"). Build output is
 gitignored, so rebuild any time rather than expecting a committed binary. Tests live in the same
-place: `.\gradlew.bat :app:testDebugUnitTest` (159) and `.\gradlew.bat :app:connectedDebugAndroidTest`
-(4, needs a running emulator or device).
+place: `.\gradlew.bat :app:testDebugUnitTest` (166) and `.\gradlew.bat :app:connectedDebugAndroidTest`
+(5, needs a running emulator or device).
 

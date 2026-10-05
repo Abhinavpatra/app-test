@@ -1,0 +1,46 @@
+rules_version = '2';
+
+// Chat rooms live at chats/{roomId}/messages/{messageId}. Room ids come from
+// ChatBuckets.roomFor ("global", "phase-menstrual", ...) and carry no personal data.
+//
+// Nothing else in the database may exist yet, so the default is deny-all and the
+// only granted access is the narrow create/read below. Messages are immutable:
+// no updates, no deletes (moderation is handled by local report/block lists until
+// a server-side review queue exists — plan.md Phase 11).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /chats/{roomId}/messages/{messageId} {
+      // Anyone signed in (anonymous sign-in counts) may read the rooms.
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        // Authorship must be provable: the stored uid is the sender's own uid.
+        && request.resource.data.authorUid == request.auth.uid
+        // Text that fits the client-side moderation policy (500 chars max).
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 1
+        && request.resource.data.text.size() <= 500
+        // Pseudonyms stay short and never structured (no ids smuggled in).
+        && request.resource.data.pseudonymousName is string
+        && request.resource.data.pseudonymousName.size() >= 1
+        && request.resource.data.pseudonymousName.size() <= 24
+        // Only the coarse buckets ChatBuckets produces — never free-form labels
+        // that could encode dates or identities.
+        && request.resource.data.phaseBucket in [
+          "on their period",
+          "just after their period",
+          "near ovulation",
+          "in the week before",
+          "somewhere in between"
+        ]
+        && request.resource.data.cycleLengthBand is string
+        && request.resource.data.createdAt is int;
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

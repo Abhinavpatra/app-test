@@ -3,7 +3,6 @@ package com.bloomcycle.app.domain.repository
 import com.bloomcycle.app.core.time.CycleDate
 import com.bloomcycle.app.domain.model.ChatIdentity
 import com.bloomcycle.app.domain.model.ChatMessage
-import com.bloomcycle.app.domain.model.ChatScope
 import com.bloomcycle.app.domain.model.ContentItem
 import com.bloomcycle.app.domain.model.ContentCategory
 import com.bloomcycle.app.domain.model.EntitlementState
@@ -48,12 +47,26 @@ interface ContentRepository {
     fun byCategory(phase: PhaseType?, category: ContentCategory): List<ContentItem>
 }
 
+/** Whether the room on screen is reading live server state or a cached echo of it. */
+enum class ChatConnection {
+    LIVE,
+    OFFLINE,
+}
+
 interface ChatRepository {
-    fun messages(scope: ChatScope): Flow<List<ChatMessage>>
+    /**
+     * Messages in one room. The room id comes from
+     * [com.bloomcycle.app.domain.model.ChatBuckets.roomFor], so two people in the same
+     * phase share a room while the repository never learns what a phase means.
+     */
+    fun messages(roomId: String): Flow<List<ChatMessage>>
+
+    /** LIVE while the room is backed by the server, OFFLINE while it serves cache only. */
+    fun connection(roomId: String): Flow<ChatConnection>
 
     /**
      * [identity] carries only a pseudonym and a coarse bucket — never an exact date,
      * never a birth date. See plan.md §7.4.
      */
-    suspend fun send(text: String, scope: ChatScope, identity: ChatIdentity)
+    suspend fun send(text: String, roomId: String, identity: ChatIdentity)
 }

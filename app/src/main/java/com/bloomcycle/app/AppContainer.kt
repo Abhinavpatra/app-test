@@ -6,11 +6,14 @@ import com.bloomcycle.app.core.time.CycleClock
 import com.bloomcycle.app.core.time.SystemCycleClock
 import com.bloomcycle.app.data.crypto.PassphraseProvider
 import com.bloomcycle.app.data.local.DatabaseFactory
+import com.bloomcycle.app.data.remote.FirebaseAuthSession
+import com.bloomcycle.app.data.remote.FirestoreChatDataSource
+import com.bloomcycle.app.data.remote.FirestoreChatRepository
 import com.bloomcycle.app.data.repo.BillingEntitlementRepository
-import com.bloomcycle.app.data.repo.ChatRepositoryImpl
 import com.bloomcycle.app.data.repo.ContentRepositoryImpl
 import com.bloomcycle.app.data.repo.CycleRepositoryImpl
 import com.bloomcycle.app.data.repo.EntitlementRepositoryImpl
+import com.bloomcycle.app.data.repo.InMemoryChatRepository
 import com.bloomcycle.app.data.repo.SettingsRepositoryImpl
 import com.bloomcycle.app.domain.repository.ChatRepository
 import com.bloomcycle.app.domain.repository.EntitlementRepository
@@ -47,12 +50,19 @@ class AppContainer(context: Context) {
     }
 
     /**
-     * Declared as the interface, mirroring [entitlements]: the day `google-services.json`
-     * lands and `BuildConfig.FIREBASE_CHAT` flips, the Firestore implementation is chosen
-     * here and no screen changes (plan.md Phase 11).
+     * Mirrors [entitlements]: `BuildConfig.FIREBASE_CHAT` (true exactly when
+     * `google-services.json` is present at build time) picks the Firestore rooms;
+     * without it the in-memory rooms stand in and nothing touches the network.
      */
     val chatRepository: ChatRepository by lazy {
-        ChatRepositoryImpl(database.chatMessageDao(), cycleClock)
+        if (BuildConfig.FIREBASE_CHAT) {
+            FirestoreChatRepository(
+                FirestoreChatDataSource(),
+                FirebaseAuthSession(),
+            )
+        } else {
+            InMemoryChatRepository(cycleClock)
+        }
     }
 
     val contentRepository: ContentRepositoryImpl by lazy { ContentRepositoryImpl() }

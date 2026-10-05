@@ -41,15 +41,3 @@ interface SymptomLogDao {
     @Query("DELETE FROM symptom_logs")
     suspend fun clear()
 }
-
-@Dao
-interface ChatMessageDao {
-    @Query("SELECT * FROM chat_messages ORDER BY createdAt ASC")
-    fun observeAll(): Flow<List<ChatMessageEntity>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(entity: ChatMessageEntity)
-
-    @Query("DELETE FROM chat_messages")
-    suspend fun clear()
-}
