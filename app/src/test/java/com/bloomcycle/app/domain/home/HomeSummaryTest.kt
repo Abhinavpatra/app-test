@@ -63,7 +63,7 @@ class HomeSummaryTest {
         val result = summary(listOf(event("2026-01-01")), today = "2026-01-10")
 
         assertNotNull(result.prediction)
-        assertEquals("Period due in 19 days", result.countdown)
+        assertEquals("Period expected in about 19 days", result.countdown)
         assertTrue(result.hasLoggedPeriod)
         assertNotNull(result.phase)
         assertNull(result.status)
@@ -74,8 +74,8 @@ class HomeSummaryTest {
     fun `countdown says today and tomorrow rather than zero and one`() {
         val periods = listOf(event("2026-01-01"))
 
-        assertEquals("Period due today", summary(periods, today = "2026-01-29").countdown)
-        assertEquals("Period due tomorrow", summary(periods, today = "2026-01-28").countdown)
+        assertEquals("Period expected today", summary(periods, today = "2026-01-29").countdown)
+        assertEquals("Period expected tomorrow", summary(periods, today = "2026-01-28").countdown)
     }
 
     @Test
@@ -84,7 +84,7 @@ class HomeSummaryTest {
 
         assertNotNull(result.prediction)
         assertTrue(result.prediction!!.isLate)
-        assertEquals("About 3 days late", result.countdown)
+        assertEquals("About 3 days past your estimated start", result.countdown)
     }
 
     // ---------------------------------------------------------------------------------------

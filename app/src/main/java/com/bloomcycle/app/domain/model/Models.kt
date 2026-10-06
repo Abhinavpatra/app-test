@@ -13,7 +13,7 @@ enum class FlowLevel(val label: String) {
 enum class PhaseType(val label: String, val subtitle: String) {
     MENSTRUAL("Menstrual", "Rest, warmth, and very little pressure"),
     FOLLICULAR("Follicular", "Energy rising — a good week for starting things"),
-    OVULATORY("Ovulatory", "Peak energy and sociability for most people"),
+    OVULATORY("Ovulatory", "For many, energy and sociability peak here"),
     LUTEAL("Luteal", "Turning inward; steady work, gentler plans"),
 }
 
@@ -211,7 +211,7 @@ enum class PremiumFeature(val title: String, val blurb: String) {
     FERTILITY_WINDOW("Fertility window", "Your most likely fertile days, with an honest confidence range."),
     LONG_HORIZON("Six months ahead", "Projected periods for the next half year, ready to plan around."),
     WORKOUT_PLAN("Movement by phase", "Suggested intensity for training, running and rest, day by day."),
-    PERSONALITY_READING("What your cycle says", "A reflective, astrology-flavoured read on your rhythm."),
+    PERSONALITY_READING("A reflective read on your rhythm", "A reflective, astrology-flavoured read on your rhythm."),
 }
 
 data class EntitlementState(

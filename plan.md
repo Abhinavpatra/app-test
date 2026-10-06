@@ -1,10 +1,10 @@
 # Implementation Plan — Period Tracking App ("Bloom")
 
-Status: **in progress.** Phases 0–10 merged to `main`, plus Phase 11 fully done — the on-device
-half (chat rooms, pseudonyms, moderation, report/block — PR #13) and the Firebase backend
-(anonymous auth, Firestore rooms, rules, App Check, `chat_messages` dropped — PR #14).
-**166 unit + 5 instrumentation tests** green (4 executed on-device, 1 new migration test written
-for the Phase 12 device session). Phase 12 not started.
+Status: **in progress.** Phases 0–11 merged to `main` (PRs #1–#14), and Phase 12's
+device-independent half is done on this branch (PR #15): JaCoCo gate, copy pass,
+onboarding disclosure, export + delete-all, a11y fixes, signing + R8, store docs.
+**170 unit + 5 instrumentation tests** green (4 executed on-device, 1 queued).
+Only the 12b device session remains.
 Last reviewed: 2026-10-06
 Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 
@@ -12,12 +12,16 @@ Target repo: `C:\Users\patra\Desktop\CompleteProjects\womenApp`
 push → open PR with `gh` → merge into `main` → delete the branch. Never push directly to `main`.
 
 **Verified green:**
-- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **166/166 unit tests**
+- `.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest` → BUILD SUCCESSFUL, **170/170 unit tests**
   (CycleCalculator 31, PhaseResolver 11, CalendarModel 17, ChartSeries 13, HomeSummary 8,
   ChatModerationPolicy 9, PeriodEntryRules 7, ReminderDecision 9, EntitlementState 6, Astrology 6,
   ChatIdentityFactory 6, InsightsAnalysis 5, FertilityReadout 5, WorkoutAdvisor 5,
   InclinationProfile 4, ChatReport 5, ChatVisibility 5, InMemoryChatRepository 5,
-  FirestoreChatRepository 6, ReminderRescheduleReceiver 3).
+  FirestoreChatRepository 6, CycleDataExport 4, ReminderRescheduleReceiver 3).
+- `.\gradlew.bat :app:jacocoCycleCalculatorCheck` → BUILD SUCCESSFUL, **CycleCalculator 100%
+  line coverage** (gate: ≥ 90%, fails the build otherwise).
+- `.\gradlew.bat :app:assembleRelease` → BUILD SUCCESSFUL through R8 (`app-release-unsigned.apk`,
+  ~12 MB); signing applies automatically when `keystore.properties` exists.
 - `.\gradlew.bat :app:connectedDebugAndroidTest` on emulator `Pixel_9` → **4/4 instrumentation tests**
   (plaintext-canary, fresh reopen, schema create, live-schema-vs-JSON), run before the 11b schema
   change. The new `migration_1_to_2` test is written and queued for the Phase 12 device session
@@ -49,7 +53,10 @@ Recommended sequencing, in priority order (phase numbers match §10):
 9. ✅ **Chat rooms, both halves** (Phase 11). 11a: pseudonyms, global + phase rooms, moderation,
    report and block (PR #13). 11b: Firebase backend — anonymous auth, Firestore rooms behind
    `FIREBASE_CHAT`, security rules, App Check, local chat table dropped (PR #14).
-10. Everything else in the README is layered on top of that loop.
+10. ✅ **Polish, device-independent half** (Phase 12a, PR #15). JaCoCo gate (CycleCalculator 100%,
+    gate ≥ 90%), copy/tone pass, onboarding privacy step, export + delete-all, a11y touch-target
+    and semantics pass, release signing + R8, store-prep docs. Device work (12b) still queued.
+11. Everything else in the README is layered on top of that loop.
 
 Estimated solo build: **6–8 weeks** to a shippable v1 covering all README features except real
 payments and live chat.
@@ -58,8 +65,8 @@ payments and live chat.
 
 ## 2. Current State — What Actually Exists
 
-The template is gone. This is now a real codebase: **93 Kotlin source files (71 main, 20 unit test,
-2 instrumentation), 166 passing unit tests + 5 on-device tests (4 executed, 1 queued), a Fraunces/Karla type system,
+The template is gone. This is now a real codebase: **95 Kotlin source files (72 main, 21 unit test,
+2 instrumentation), 170 passing unit tests + 5 on-device tests (4 executed, 1 queued), a Fraunces/Karla type system,
 and one merged PR per completed phase.**
 
 ### Done (Phases 0–10)
@@ -72,6 +79,7 @@ and one merged PR per completed phase.**
 | Cycle engine | `domain/cycle/CycleCalculator.kt`, `domain/cycle/PhaseResolver.kt` |
 | Domain logic | `domain/home/HomeSummary.kt` (Today card), `domain/validation/PeriodEntryRules.kt` |
 | Repositories | `domain/repository/Repositories.kt` + `data/repo/{Cycle,Settings,Entitlement,Content}RepositoryImpl.kt`, `data/repo/InMemoryChatRepository.kt`, `data/remote/{AuthSession,FirestoreChatDataSource,FirestoreChatRepository}.kt` |
+| Export | `domain/export/CycleDataExport.kt` — hand-rolled versioned JSON (periods, symptoms, settings; chat excluded) |
 | Content | `domain/content/ContentLibrary.kt` — ~15 curated, cited items |
 | Persistence | `data/local/{Entities,Daos,Converters,AppDatabase,DatabaseFactory}.kt`, `data/crypto/PassphraseProvider.kt` |
 | Entitlements | `data/repo/{EntitlementRepositoryImpl,BillingEntitlementRepository}.kt` — seam picked by `BuildConfig.BILLING` |
@@ -80,8 +88,9 @@ and one merged PR per completed phase.**
 | Shell | `ui/BloomApp.kt`, `ui/navigation/BloomDestination.kt`, `ui/phase/PhaseVisuals.kt`, `ui/SoundEffects.kt` |
 | Components | `ui/components/{Components,Placeholder,DateField,PremiumGate}.kt`, `ui/format/DateText.kt` |
 | Charts | `ui/charts/Charts.kt` — cycle-length line, period-duration bars, phase wheel, symptom heatmap |
-| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet,CalendarScreen,InsightsScreen,PaywallScreen,ReadingsScreen,ChatScreen}.kt` all real (chat reads Firestore when `FIREBASE_CHAT` is true, with an offline banner from snapshot metadata) |
-| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),CalendarModelTest(17),ChartSeriesTest(13),HomeSummaryTest(8),ChatModerationPolicyTest(9),PeriodEntryRulesTest(7),ReminderDecisionTest(9),EntitlementStateTest(6),AstrologyTest(6),ChatIdentityFactoryTest(6),InsightsAnalysisTest(5),FertilityReadoutTest(5),WorkoutAdvisorTest(5),InclinationProfileTest(4),ChatReportTest(5),ChatVisibilityTest(5),InMemoryChatRepositoryTest(5),FirestoreChatRepositoryTest(6),ReminderRescheduleReceiverTest(3)}.kt` = 166 |
+| Screens | `ui/screens/{Home,Settings,Onboarding,PeriodLogSheet,SymptomLogSheet,CalendarScreen,InsightsScreen,PaywallScreen,ReadingsScreen,ChatScreen}.kt` all real (chat reads Firestore when `FIREBASE_CHAT` is true, with an offline banner from snapshot metadata; onboarding is 7 steps incl. the privacy disclosure; Settings has export + delete-all) |
+| Store docs | `docs/{data-safety,privacy-policy,store-listing}.md` — Data safety answers, privacy policy draft, listing copy + rating guidance |
+| Tests | `src/test/.../{CycleCalculatorTest(31),PhaseResolverTest(11),CalendarModelTest(17),ChartSeriesTest(13),HomeSummaryTest(8),ChatModerationPolicyTest(9),PeriodEntryRulesTest(7),ReminderDecisionTest(9),EntitlementStateTest(6),AstrologyTest(6),ChatIdentityFactoryTest(6),InsightsAnalysisTest(5),FertilityReadoutTest(5),WorkoutAdvisorTest(5),InclinationProfileTest(4),ChatReportTest(5),ChatVisibilityTest(5),InMemoryChatRepositoryTest(5),FirestoreChatRepositoryTest(6),CycleDataExportTest(4),ReminderRescheduleReceiverTest(3)}.kt` = 170 |
 | Instrumentation | `src/androidTest/.../{DatabasePersistenceTest,MigrationSchemaTest}.kt` (5 — the new `migration_1_to_2` queued for the device session) |
 | Schema baselines | `app/schemas/com.bloomcycle.app.data.local.AppDatabase/{1,2}.json` (v2 drops `chat_messages`) |
 
@@ -110,7 +119,8 @@ One branch → PR → merge per phase, never a direct push to `main`. Pattern:
 | 9 entitlements & paywall | `phase-9-entitlements` | #11 ✅ |
 | 10 premium analyses | `phase-10-premium-analyses` | #12 ✅ |
 | 11 chat (on-device half) | `phase-11-chat` | #13 ✅ |
-| 11b chat (Firebase backend) | `phase-11b-firebase` | #14 ⬜ |
+| 11b chat (Firebase backend) | `phase-11b-firebase` | #14 ✅ |
+| 12a polish (device-independent) | `phase-12-polish` | #15 ⬜ |
 
 `origin` = `https://github.com/Abhinavpatra/app-test.git`, `gh` v2.69.0 authenticated as
 `Abhinavpatra`. Run `git log --oneline -10` for the live list.
@@ -334,6 +344,8 @@ Library list:
 | Chat | Firebase BOM 34.19.0 → `firebase-auth`, `firebase-firestore` | ✅ Phase 11b |
 | Firebase config | `com.google.gms.google-services` 4.5.0 plugin, conditional on the json | ✅ Phase 11b (R4 verified green) |
 | App Check | `firebase-appcheck`, `-debug`, `-playintegrity` (plain `implementation`; `BuildConfig.DEBUG` picks the factory) | ✅ Phase 11b (console registration pending) |
+| Coverage | `jacoco` plugin + `jacocoCycleCalculatorCheck` task (CycleCalculator ≥ 90% line, fails the build) | ✅ Phase 12a (measures 100%) |
+| Release | optional `keystore.properties` signing + R8 minify/shrink with `proguard-rules.pro` | ✅ Phase 12a (`assembleRelease` green, unsigned without the file) |
 | Tests | `app.cash.turbine`, `kotlinx-coroutines-test` | ✅ · `room3-testing` ✅ (Phase 4) |
 
 ### 5.4 ⚠️ Room 3 gotchas (hit and already paid for)
@@ -1172,34 +1184,47 @@ with the Phase 12 device session.)
 
 ---
 
-### Phase 12 — Polish, Testing & Release ⬜ next (PR #15)
+### Phase 12 — Polish, Testing & Release · **12a ✅ (PR #15 ⬜)** · 12b queued (device session)
 **Effort:** ~4–6 days · **Also carries the Phase 2 accessibility audit and the Phase 8 content copy review.**
 
 Split by what one machine can actually do: everything in 12a is code and ships in PR #15;
 everything in 12b needs a device or a human and is executed/recorded in the device session.
 
-**12a — device-independent (PR #15):**
+**12a — device-independent (PR #15, done):**
 
-- [ ] Full unit test pass; **CycleCalculator coverage ≥ 90%** measured with JaCoCo wired into
-      `testDebugUnitTest` (unit side: 166 tests exist; instrumentation side: 5).
-- [ ] Copy review pass for the "soft, inclusive" tone (README line 15) — `strings.xml` **and** the
-      copy hardcoded in composables, including error states. Avoid clinical language; avoid shame
-      about irregularity.
-- [ ] Onboarding content explaining what is stored on-device vs. sent to the server (risk R8 —
-      chat is the one thing that leaves unencrypted).
-- [ ] Data export (user-requested JSON via the system file picker) and a **"Delete all my data"**
-      action wired to the existing `CycleRepository.eraseEverything()` (currently no UI at all).
-- [ ] Accessibility **static** audit: content descriptions, touch targets ≥ 48dp, font scaling,
-      RTL mirrors (`supportsRtl` is already `true`) — fix what the code shows.
-- [ ] Tablet/foldable: confirm the adaptive `NavigationSuiteScaffold` breakpoints and screen
-      padding hold at tablet widths; adjust if the code shows otherwise.
-- [ ] Release signing config (`keystore.properties` / env vars, skipped cleanly when absent) and
-      R8/ProGuard rules with the release build minified (SQLCipher ships consumer rules as of
-      4.14.0).
-- [ ] Play Store prep **documents** (in `docs/`): Data safety form answers, privacy policy
-      including the chat component, content-rating notes, target audience, medical disclaimer for
-      the listing.
-- [ ] Tests green; plan.md/README synced; PR #15 → merge → rebuild APK.
+- [x] Full unit test pass (**170**, incl. new `CycleDataExportTest` 4); **CycleCalculator 100% line
+      coverage** via the `jacocoCycleCalculatorCheck` gate (≥ 90%, fails the build).
+- [x] Copy review pass for the "soft, inclusive" tone — `strings.xml` needed nothing; 14
+      hardcoded strings softened (`Irregular` → `Varies a lot right now`, `days late` → `past
+      your estimated start`, `Period due` → `Period expected`, `Mute` → `Pause`, `Peak window`
+      → `Higher-energy window`, `What your cycle says` → `A reflective read on your rhythm`,
+      `No phase yet` → `Not enough to name a phase yet`, `PMS` → `Premenstrual shifts`,
+      `low` → `resting`, `You tend to` → `You might enjoy`, `Say something first` →
+      `Write something first, then send`, chevron-adjacent `outside the usual band` reworded).
+      Affected assertions updated (`HomeSummaryTest`, `AstrologyTest`).
+- [x] Onboarding privacy step (R8 — 7 steps now): what stays encrypted on-device vs. what chat
+      posts send to the server; welcome copy no longer claims everything stays on-device.
+- [x] Data export (`domain/export/CycleDataExport.kt`, hand-rolled versioned JSON via SAF
+      `CreateDocument`, chat excluded) and **"Delete all my data"** (confirm dialog →
+      `CycleRepository.eraseEverything()` + reminder resync) in Settings, beside a rewritten
+      Privacy section that tells the truth about chat.
+- [x] Accessibility **static** audit: `SoftCard(onClick)` carries `role=Button`
+      (`ChatEntryCard` adds its description); 48dp floors on RoomPill, year-strip months,
+      DayCells, FilterChips and all flagged TextButtons; `mirrorForRtl()` for chevrons
+      (no AutoMirrored variants exist in icons-extended 1.7.8); over-limit char count and
+      consistency score expose text descriptions instead of colour alone. M3 IconButtons
+      already meet 48dp; font-scale hazards noted for the device session (no clipping found
+      in static review).
+- [x] Tablet/foldable: `NavigationSuiteScaffold` auto-switches bar ↔ rail by window size
+      class; all screens are fluid (`fillMaxWidth`, no fixed phone widths) — confirmed by
+      inspection, no changes needed.
+- [x] Release signing config (`keystore.properties` / committed `.example`, cleanly absent →
+      unsigned) and R8 (`proguard-rules.pro`, minify + shrinkResources) — `assembleRelease`
+      green, ~12 MB unsigned APK.
+- [x] Play Store prep **documents** (`docs/`): Data safety answers, privacy policy draft
+      (needs a contact address + legal review), store listing + Teen-rating guidance +
+      medical disclaimer.
+- [x] Tests green; plan.md/README synced; PR #15 → merge → rebuild APK.
 
 **12b — device/human-blocked (recorded, not run in this environment):**
 
@@ -1271,21 +1296,21 @@ State these now so they do not creep in:
 
 ## 14. Where We Are & Next Actions
 
-**Position:** Phases 0–11 merged (11b ships as PR #14). Build green,
-**166/166 unit tests + 4/4 executed instrumentation tests** (1 new migration test queued),
-schema v2 committed, installable APK at
-`app\build\outputs\apk\debug\app-debug.apk` (see `README.md`). Still not deployed or device-verified:
-`firebase deploy` of the 11b rules/indexes, the App Check console steps, the two-device chat
-acceptance, and the `migration_1_to_2` run — all queued for the Phase 12 device session.
+**Position:** Phases 0–11 merged (PRs #1–#14); Phase 12a done on this branch (PR #15).
+Build green — **170/170 unit tests**, CycleCalculator 100% line coverage, `assembleRelease`
+through R8; schema v2 committed; installable APK at
+`app\build\outputs\apk\debug\app-debug.apk` (see `README.md`). Still not deployed or
+device-verified: `firebase deploy` of the 11b rules/indexes, the App Check console steps,
+the two-device chat acceptance, the `migration_1_to_2` run, TalkBack/large-font walkthrough —
+all queued for the Phase 12 device session (12b).
 
 **Next, in order:**
 
-1. **Phase 11b — merge + rebuild (PR #14):** review, merge to `main`, rebuild the APK.
-2. **Phase 12a — polish (PR #15):** copy/tone pass, on-device vs server disclosure, data export +
-   delete-all, static accessibility audit, release signing + R8, Play Store prep docs, coverage.
-   The device-blocked half (12b) stays queued for the device session.
-3. Still open across phases: a review of
-   `ContentLibrary.kt` citations (Q2 → Phase 12), Phase 8's deferred on-device firing test (Q9),
-   and real Play Billing behind `BuildConfig.BILLING` (store release).
+1. **Phase 12a — merge + rebuild (PR #15):** review, merge to `main`, rebuild the APK.
+2. **Phase 12b — device session:** 11b acceptance (two devices, rules block a foreign write,
+   airplane mode), `migration_1_to_2` run, Phase 8 firing test (Q9), TalkBack audit, Phase 10
+   rendering check, App Check console steps, internal testing track.
+3. Still open: `ContentLibrary.kt` citation review (Q2), real Play Billing behind
+   `BuildConfig.BILLING`, privacy-policy contact address + legal review (store release).
 
 **Branch/PR discipline:** one branch per phase, never push to `main`, commit messages **4–15 words**.

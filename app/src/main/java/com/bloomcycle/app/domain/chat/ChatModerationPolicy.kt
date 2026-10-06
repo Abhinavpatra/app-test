@@ -48,7 +48,7 @@ object ChatModerationPolicy {
     fun check(text: String, lastSentAt: Instant?, now: Instant): SendVerdict {
         val clean = text.trim()
         if (clean.isEmpty()) {
-            return SendVerdict(SendBlockReason.EMPTY, "Say something first.")
+            return SendVerdict(SendBlockReason.EMPTY, "Write something first, then send.")
         }
         if (clean.length > MAX_LENGTH) {
             return SendVerdict(

@@ -46,7 +46,7 @@ object WorkoutAdvisor {
         PhaseType.OVULATORY -> PhaseAdvice(
             phase = phase,
             intensity = Intensity.PEAK,
-            summary = "Peak window",
+            summary = "Higher-energy window",
             suggestion = "Strength and speed often come easiest now. A natural slot for a personal " +
                 "best, a long run or a game with friends.",
         )
@@ -62,7 +62,7 @@ object WorkoutAdvisor {
         null -> PhaseAdvice(
             phase = null,
             intensity = Intensity.GENTLE,
-            summary = "No phase yet",
+            summary = "Not enough to name a phase yet",
             suggestion = "Log a period and this becomes specific to your cycle. Until then, " +
                 "whatever you already enjoy doing is the right thing.",
         )

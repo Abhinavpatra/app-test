@@ -3,7 +3,14 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room3)
+    alias(libs.plugins.jacoco)
 }
+
+import org.gradle.api.tasks.testing.Test
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
+import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
+import org.gradle.testing.jacoco.tasks.JacocoReport
+import java.util.Properties
 
 // The google-services plugin is on the classpath via the root `apply false` declaration
 // but is only applied when the config file exists. Fresh clones without
@@ -48,11 +55,35 @@ android {
         buildConfigField("boolean", "BILLING", "false")
     }
 
+    // Release signing reads `keystore.properties` at the repo root (see the committed
+    // `.example`). Absent file = unsigned release build that still compiles — including
+    // through R8 — so CI and fresh clones always verify the release pipeline.
+    signingConfigs {
+        val keystorePropsFile = rootProject.file("keystore.properties")
+        if (keystorePropsFile.exists()) {
+            val keystoreProps = Properties()
+                .apply { load(keystorePropsFile.inputStream()) }
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             optimization {
                 enable = false
             }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
     compileOptions {
@@ -128,4 +159,63 @@ dependencies {
     androidTestImplementation(libs.kotlinx.coroutines.test)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
+
+// Phase 12 coverage gate: CycleCalculator line coverage must stay >= 90%.
+// The report/verification tasks below run on the debug unit-test execution data;
+// `./gradlew :app:jacocoCycleCalculatorCheck` fails the build when the gate breaks.
+jacoco {
+    toolVersion = libs.versions.jacoco.get()
+}
+tasks.withType<Test> {
+    extensions.configure<JacocoTaskExtension> { isEnabled = true }
+}
+
+// Class output of the debug Kotlin compile. The path is owned by the Kotlin Gradle
+// plugin's AGP integration; if a toolchain upgrade moves it, the report comes back
+// empty and the check passes vacuously — so `jacocoCycleCalculatorReport` also
+// asserts non-empty coverage (see the `doLast` below).
+val cycleCalculatorClasses = fileTree(
+    layout.buildDirectory.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"),
+) {
+    include("com/bloomcycle/app/domain/cycle/CycleCalculator*.class")
+}
+
+tasks.register<JacocoReport>("jacocoCycleCalculatorReport") {
+    group = "verification"
+    description = "Line coverage report for CycleCalculator (Phase 12 gate)."
+    dependsOn("testDebugUnitTest")
+    classDirectories.setFrom(cycleCalculatorClasses)
+    sourceDirectories.setFrom(layout.projectDirectory.dir("src/main/java"))
+    executionData.setFrom(files(layout.buildDirectory.file("jacoco/testDebugUnitTest.exec")))
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+    doLast {
+        val covered = classDirectories.files.sumOf { dir ->
+            dir.walkTopDown().count { it.extension == "class" }
+        }
+        require(covered > 0) {
+            "No CycleCalculator classes found — the intermediates path above is stale."
+        }
+    }
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoCycleCalculatorCheck") {
+    group = "verification"
+    description = "Fails when CycleCalculator line coverage drops below 90%."
+    dependsOn("jacocoCycleCalculatorReport")
+    classDirectories.setFrom(cycleCalculatorClasses)
+    sourceDirectories.setFrom(layout.projectDirectory.dir("src/main/java"))
+    executionData.setFrom(files(layout.buildDirectory.file("jacoco/testDebugUnitTest.exec")))
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.90".toBigDecimal()
+            }
+        }
+    }
 }

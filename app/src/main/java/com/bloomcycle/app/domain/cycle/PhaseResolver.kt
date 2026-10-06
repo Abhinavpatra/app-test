@@ -112,7 +112,7 @@ object PhaseResolver {
             CycleCalculator.lengthsForStats(cycles).size < 3 -> "Still learning your rhythm"
             CycleCalculator.regularityDays(cycles) <= 2.0 -> "Your rhythm looks consistent"
             CycleCalculator.regularityDays(cycles) <= 4.0 -> "Your rhythm varies a little"
-            else -> "Your rhythm is fairly unpredictable right now"
+            else -> "Your rhythm moves around a lot right now"
         }
         val note = CycleCalculator.typicalityNote(CycleCalculator.lengthsForStats(cycles))
             ?: return base

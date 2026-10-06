@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -109,6 +111,8 @@ fun SymptomLogSheet(
                                 }
                             },
                             label = { Text(definition.label) },
+                            // Stock chips are 32dp tall; the floor keeps them tappable.
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp),
                         )
                     }
                 }

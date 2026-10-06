@@ -24,7 +24,7 @@ data class HomeSummary(
     val status: String?,
     /** Non-null whenever the user's [CycleContext] means dates must be hedged. */
     val caveat: String?,
-    /** e.g. "Period due in 5 days". Null when there is no prediction to count down to. */
+    /** e.g. "Period expected in about 5 days". Null when there is no prediction to count down to. */
     val countdown: String?,
     /** False before the first real (non-spotting) period is logged. */
     val hasLoggedPeriod: Boolean,
@@ -66,9 +66,9 @@ object HomeSummarizer {
     private fun countdownFor(prediction: CyclePrediction?): String? = when {
         prediction == null -> null
         // The engine reports a late period as a negative day count.
-        prediction.daysUntilNextPeriod < 0 -> "About ${-prediction.daysUntilNextPeriod} days late"
-        prediction.daysUntilNextPeriod == 0L -> "Period due today"
-        prediction.daysUntilNextPeriod == 1L -> "Period due tomorrow"
-        else -> "Period due in ${prediction.daysUntilNextPeriod} days"
+        prediction.daysUntilNextPeriod < 0 -> "About ${-prediction.daysUntilNextPeriod} days past your estimated start"
+        prediction.daysUntilNextPeriod == 0L -> "Period expected today"
+        prediction.daysUntilNextPeriod == 1L -> "Period expected tomorrow"
+        else -> "Period expected in about ${prediction.daysUntilNextPeriod} days"
     }
 }

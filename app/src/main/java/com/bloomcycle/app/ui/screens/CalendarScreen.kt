@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -74,6 +75,7 @@ import com.bloomcycle.app.domain.model.SymptomLog
 import com.bloomcycle.app.domain.model.UserSettings
 import com.bloomcycle.app.ui.components.Gap
 import com.bloomcycle.app.ui.components.Hairline
+import com.bloomcycle.app.ui.components.mirrorForRtl
 import com.bloomcycle.app.ui.components.PhaseChip
 import com.bloomcycle.app.ui.components.PrimaryButton
 import com.bloomcycle.app.ui.components.SecondaryButton
@@ -213,7 +215,11 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                                 }
                             },
                         ) {
-                            Icon(Icons.Outlined.ChevronLeft, contentDescription = "Previous month")
+                            Icon(
+                                Icons.Outlined.ChevronLeft,
+                                contentDescription = "Previous month",
+                                modifier = Modifier.mirrorForRtl(),
+                            )
                         }
                         IconButton(
                             onClick = {
@@ -225,7 +231,11 @@ fun CalendarScreen(modifier: Modifier = Modifier) {
                                 }
                             },
                         ) {
-                            Icon(Icons.Outlined.ChevronRight, contentDescription = "Next month")
+                            Icon(
+                                Icons.Outlined.ChevronRight,
+                                contentDescription = "Next month",
+                                modifier = Modifier.mirrorForRtl(),
+                            )
                         }
                     }
                 },
@@ -418,6 +428,8 @@ private fun DayCell(marks: DayMarks, onClick: () -> Unit, modifier: Modifier = M
     Box(
         modifier = modifier
             .fillMaxSize()
+            // Cells shrink with screen width; the floor keeps every day tappable.
+            .defaultMinSize(minHeight = 48.dp)
             .clip(shape)
             .background(if (logged) loggedColor else Color.Transparent, shape)
             .then(
@@ -513,6 +525,8 @@ private fun YearStrip(
                 val marks = marked[month].orEmpty()
                 Surface(
                     onClick = { onMonth(month) },
+                    // Twelve abbreviations in a row are short; the floor keeps them tappable.
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp),
                     shape = MaterialTheme.shapes.small,
                     color = if (isCurrent) {
                         MaterialTheme.colorScheme.primaryContainer
@@ -591,7 +605,10 @@ private fun LegendCard(visible: Boolean, onToggle: () -> Unit, modifier: Modifie
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onToggle) {
+            TextButton(
+                onClick = onToggle,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+            ) {
                 Text(if (visible) "Hide" else "Explain")
             }
         }
@@ -675,7 +692,7 @@ private fun DayMark.title(): String = when (this) {
     DayMark.PREDICTED_PERIOD -> "Estimated arrival window"
     DayMark.FERTILE_WINDOW -> "Fertile window estimate"
     DayMark.TODAY -> "Today"
-    DayMark.OUTSIDE_TYPICAL_RANGE -> "A cycle outside the usual band"
+    DayMark.OUTSIDE_TYPICAL_RANGE -> "A cycle that ran shorter or longer than usual"
 }
 
 private fun DayMark.explanation(): String = when (this) {
@@ -703,7 +720,7 @@ private fun DayMark.spoken(): String = when (this) {
     DayMark.PREDICTED_PERIOD -> "inside the estimated arrival window"
     DayMark.FERTILE_WINDOW -> "in the fertile window estimate"
     DayMark.TODAY -> "today"
-    DayMark.OUTSIDE_TYPICAL_RANGE -> "in a cycle outside the typical range"
+    DayMark.OUTSIDE_TYPICAL_RANGE -> "in a cycle that ran shorter or longer than usual"
 }
 
 // --- Day detail sheet ---------------------------------------------------------------------

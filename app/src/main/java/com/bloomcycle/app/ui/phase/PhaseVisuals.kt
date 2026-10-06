@@ -37,7 +37,7 @@ enum class PhaseVisual(
         phase = PhaseType.LUTEAL,
         glyph = "◑",
         label = "Luteal",
-        blurb = "The long stretch before your period. PMS often lands here.",
+        blurb = "The long stretch before your period. Premenstrual shifts often land here.",
     ),
     ;
 

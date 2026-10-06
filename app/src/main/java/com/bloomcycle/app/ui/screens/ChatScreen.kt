@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -363,9 +364,11 @@ fun ChatScreen(modifier: Modifier = Modifier) {
 private fun RoomPill(label: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.semantics {
-            contentDescription = if (selected) "$label, selected room" else "$label room"
-        },
+        modifier = Modifier
+            .defaultMinSize(minHeight = 48.dp)
+            .semantics {
+                contentDescription = if (selected) "$label, selected room" else "$label room"
+            },
         shape = MaterialTheme.shapes.extraLarge,
         color = if (selected) {
             MaterialTheme.colorScheme.primaryContainer
@@ -492,6 +495,15 @@ private fun Composer(
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
+                // The colour shift alone must not carry the over-limit state.
+                modifier = Modifier.semantics {
+                    contentDescription = if (draft.length > ChatModerationPolicy.MAX_LENGTH) {
+                        "Message is ${draft.length - ChatModerationPolicy.MAX_LENGTH} " +
+                            "characters over the limit"
+                    } else {
+                        "${draft.length} of ${ChatModerationPolicy.MAX_LENGTH} characters used"
+                    }
+                },
             )
         }
     }
@@ -519,7 +531,9 @@ private fun ReportDialog(
                 ReportReason.entries.forEach { reason ->
                     TextButton(
                         onClick = { onReason(reason) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 48.dp),
                     ) {
                         Text(
                             text = reason.label,
@@ -531,7 +545,9 @@ private fun ReportDialog(
                 Hairline()
                 TextButton(
                     onClick = onBlock,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 48.dp),
                 ) {
                     Text(
                         text = "Block $authorName",

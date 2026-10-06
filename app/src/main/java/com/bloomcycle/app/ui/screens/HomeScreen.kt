@@ -42,6 +42,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,6 +61,7 @@ import com.bloomcycle.app.ui.components.EmptyState
 import com.bloomcycle.app.ui.components.Gap
 import com.bloomcycle.app.ui.components.Hairline
 import com.bloomcycle.app.ui.components.PrimaryButton
+import com.bloomcycle.app.ui.components.mirrorForRtl
 import com.bloomcycle.app.ui.components.SecondaryButton
 import com.bloomcycle.app.ui.components.SectionHeader
 import com.bloomcycle.app.ui.components.SoftCard
@@ -268,7 +271,9 @@ private fun ChatEntryCard() {
     val navController = LocalNavController.current
     SoftCard(
         onClick = { navController?.navigate(BloomDestination.Chat.route) },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = "Talk it through, open chat" },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
@@ -279,7 +284,11 @@ private fun ChatEntryCard() {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Icon(Icons.Outlined.ChevronRight, contentDescription = null)
+            Icon(
+                Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.mirrorForRtl(),
+            )
         }
     }
 }

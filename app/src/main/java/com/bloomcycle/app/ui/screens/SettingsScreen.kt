@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -34,8 +35,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloomcycle.app.BuildConfig
+import com.bloomcycle.app.domain.export.buildExportJson
 import com.bloomcycle.app.domain.model.CycleContext
 import com.bloomcycle.app.domain.model.EntitlementState
 import com.bloomcycle.app.domain.model.PremiumFeature
@@ -51,6 +54,7 @@ import com.bloomcycle.app.ui.components.SoftCard
 import com.bloomcycle.app.ui.navigation.BloomDestination
 import com.bloomcycle.app.ui.rememberAppContainer
 import com.bloomcycle.app.ui.theme.Spacing
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -77,6 +81,31 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     val navController = LocalNavController.current
 
     var pickingTime by remember { mutableStateOf(false) }
+    var confirmingErase by remember { mutableStateOf(false) }
+
+    // System file picker: the user chooses where the JSON lands, so the app never
+    // needs storage permission for the export.
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val json = buildExportJson(
+                    periods = container.cycleRepository.observePeriods().first(),
+                    symptoms = container.cycleRepository.observeSymptoms().first(),
+                    settings = container.settings.settings.first(),
+                    exportedAt = container.cycleClock.now().toString(),
+                    appVersion = BuildConfig.VERSION_NAME,
+                )
+                appContext.contentResolver.openOutputStream(uri)?.use { out ->
+                    out.write(json.toByteArray())
+                }
+            }
+        }
+    }
+    val exportFileName: () -> String = {
+        "bloom-export-${container.cycleClock.today()}.json"
+    }
 
     // Asked once, from onboarding or here. After that, if it is still off the user has said
     // no (or been denied) and the only route left is the system settings screen, so we stop
@@ -153,7 +182,10 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     }
 
                     if (current.remindersEnabled) {
-                        TextButton(onClick = { pickingTime = true }) {
+                        TextButton(
+                            onClick = { pickingTime = true },
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                        ) {
                             Text(
                                 text = "At " + "%02d:%02d".format(
                                     current.reminderHour,
@@ -196,7 +228,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Mute predictions", style = MaterialTheme.typography.titleMedium)
+                            Text("Pause predictions", style = MaterialTheme.typography.titleMedium)
                             Text(
                                 text = "Keep the calendar, silence every date prediction.",
                                 style = MaterialTheme.typography.bodySmall,
@@ -211,7 +243,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                                 }
                             },
                             modifier = Modifier.semantics {
-                                contentDescription = "Mute predictions, " +
+                                contentDescription = "Pause predictions, " +
                                     if (current.predictionsMuted) "on" else "off"
                             },
                         )
@@ -293,7 +325,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     }
                     TextButton(
                         onClick = { navController?.navigate(BloomDestination.PAYWALL) },
-                        modifier = Modifier.semantics { contentDescription = "Open Premium" },
+                        modifier = Modifier
+                            .defaultMinSize(minHeight = 48.dp)
+                            .semantics { contentDescription = "Open Premium" },
                     ) { Text("Open") }
                 }
             }
@@ -330,14 +364,23 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 }
             }
 
-            SectionHeader(eyebrow = "Privacy", title = "Stays on this device")
+            SectionHeader(eyebrow = "Privacy", title = "Your data, in plain words")
 
             SoftCard {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                     Text(
-                        text = "Your cycles are encrypted on this phone with a key only you hold. " +
-                            "Nothing is uploaded, and there is no account to create or leak. " +
-                            "Clearing this app's data removes them for good.",
+                        text = "Your cycles stay on this phone, encrypted with a key only you " +
+                            "hold. There is no account to create or leak, and clearing this " +
+                            "app's data removes them for good.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Gap(Spacing.xxxs)
+                    Text(
+                        text = "Chat is the one exception: anything you post goes to our " +
+                            "servers so the room can read it. Posts carry a made-up name and " +
+                            "a coarse phase label only — never your name, your dates or your " +
+                            "birth date.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -351,7 +394,91 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     )
                 }
             }
+
+            SoftCard {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Export my data", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = "Your periods, symptoms and settings as one JSON file. " +
+                                    "Chat posts are not included — they belong to shared rooms.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(
+                            onClick = { exportLauncher.launch(exportFileName()) },
+                            modifier = Modifier
+                                .defaultMinSize(minHeight = 48.dp)
+                                .semantics { contentDescription = "Export my data" },
+                        ) { Text("Export") }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Delete all my data", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = "Removes every period and symptom on this device. " +
+                                    "This cannot be undone.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(
+                            onClick = { confirmingErase = true },
+                            modifier = Modifier
+                                .defaultMinSize(minHeight = 48.dp)
+                                .semantics { contentDescription = "Delete all my data" },
+                        ) {
+                            Text(
+                                text = "Delete",
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    if (confirmingErase && current != null) {
+        AlertDialog(
+            onDismissRequest = { confirmingErase = false },
+            title = { Text("Delete everything?") },
+            text = {
+                Text(
+                    text = "Every period and symptom on this device goes away, and " +
+                        "reminders start over from nothing. This cannot be undone.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmingErase = false
+                        scope.launch {
+                            container.cycleRepository.eraseEverything()
+                            container.resyncReminder()
+                        }
+                    },
+                ) {
+                    Text(
+                        text = "Delete everything",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingErase = false }) { Text("Keep my data") }
+            },
+        )
     }
 
     if (pickingTime && current != null) {
