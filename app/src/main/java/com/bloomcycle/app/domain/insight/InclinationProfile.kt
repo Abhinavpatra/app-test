@@ -31,7 +31,7 @@ data class InclinationProfile(
             return when (inclination) {
                 Inclination.SCHOLAR -> InclinationProfile(
                     inclination = inclination,
-                    focus = "You tend to orient around understanding things first.",
+                    focus = "You might enjoy orienting around understanding things first.",
                     studyFocus = "Deep single-subject blocks suit you: one book, one skill, " +
                         "at a time.",
                     athleticFocus = "Technique-led movement — a class, a coach, learning a lift " +
@@ -40,14 +40,14 @@ data class InclinationProfile(
 
                 Inclination.MAKER -> InclinationProfile(
                     inclination = inclination,
-                    focus = "You tend to orient around making something.",
+                    focus = "You might enjoy orienting around making something.",
                     studyFocus = "Project-shaped study: build the thing, then read around the gaps.",
                     athleticFocus = "Play-shaped movement — a sport, a route, a game you want to win.",
                 )
 
                 Inclination.ATHLETE -> InclinationProfile(
                     inclination = inclination,
-                    focus = "You tend to orient around doing and moving.",
+                    focus = "You might enjoy orienting around doing and moving.",
                     studyFocus = "Short scheduled sessions beat long ones; spaced practice fits you.",
                     athleticFocus = "Progress-shaped movement: a programme, a distance, a number " +
                         "to beat.",

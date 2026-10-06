@@ -186,7 +186,7 @@ object CycleCalculator {
         val base = when {
             regularityOf(lengths) <= 2.0 -> "Very consistent"
             regularityOf(lengths) <= 4.0 -> "Varies a little"
-            else -> "Irregular"
+            else -> "Varies a lot right now"
         }
 
         val note = typicalityNote(lengths) ?: return base

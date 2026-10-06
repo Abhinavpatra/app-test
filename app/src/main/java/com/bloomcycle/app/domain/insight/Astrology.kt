@@ -37,7 +37,7 @@ data class Biorhythm(
         value >= 15 -> "building"
         value > -15 -> "turning"
         value > -60 -> "easing"
-        else -> "low"
+        else -> "resting"
     }
 
     companion object {

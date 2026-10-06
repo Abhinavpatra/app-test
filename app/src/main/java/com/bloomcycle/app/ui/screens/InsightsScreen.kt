@@ -23,6 +23,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -292,7 +294,12 @@ private fun ConsistencyCard(report: InsightsReport) {
                 text = report.consistencyScore.toString(),
                 style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.Light,
+                // Decorative colour only — the number and the label beside it carry the meaning.
                 color = Bloom.phaseColor(PhaseType.FOLLICULAR),
+                modifier = Modifier.semantics {
+                    contentDescription =
+                        "Consistency ${report.consistencyScore}, ${report.regularityLabel}"
+                },
             )
             Spacer(Modifier.width(Spacing.sm))
             Column {

@@ -29,8 +29,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -48,6 +52,16 @@ import com.bloomcycle.app.ui.theme.Spacing
  */
 
 // --- SoftCard ---------------------------------------------------------------------------
+
+/**
+ * Mirrors a directional glyph (chevrons have no AutoMirrored variant in the icons set
+ * we ship) so "next" still points forward in RTL layouts.
+ */
+@Composable
+fun Modifier.mirrorForRtl(): Modifier {
+    val direction = LocalLayoutDirection.current
+    return graphicsLayer { scaleX = if (direction == LayoutDirection.Rtl) -1f else 1f }
+}
 
 @Composable
 fun SoftCard(
@@ -81,7 +95,9 @@ fun SoftCard(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier,
+        // Screens pass their own contentDescription; the role marks this as a button
+        // so TalkBack never presents a silent tappable container.
+        modifier = modifier.semantics { role = Role.Button },
         enabled = enabled,
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
@@ -109,7 +125,7 @@ fun PhaseChip(
 ) {
     val visual = PhaseVisual.of(phase)
     val tint = Bloom.phaseColor(phase)
-    val label = visual?.label ?: "No phase yet"
+    val label = visual?.label ?: "Not enough to name a phase yet"
 
     Surface(
         modifier = modifier.semantics { contentDescription = "Phase: $label" },

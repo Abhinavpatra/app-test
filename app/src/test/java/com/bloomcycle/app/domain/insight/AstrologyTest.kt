@@ -51,7 +51,7 @@ class AstrologyTest {
 
         assertEquals("turning", rhythm.word(0))
         assertEquals("full", rhythm.word(88))
-        assertEquals("low", rhythm.word(-88))
+        assertEquals("resting", rhythm.word(-88))
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.bloomcycle.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloomcycle.app.domain.model.EntitlementState
 import com.bloomcycle.app.domain.model.PremiumFeature
@@ -68,6 +70,7 @@ fun PaywallScreen(
                 onClick = onBack,
                 modifier = Modifier
                     .align(Alignment.Start)
+                    .defaultMinSize(minHeight = 48.dp)
                     .semantics { contentDescription = "Back" },
             ) {
                 Text("Back")

@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -104,7 +106,12 @@ fun PeriodLogSheet(
                 onClick = { picking = DatePick.END },
             )
             if (endDate != null) {
-                TextButton(onClick = { endDate = null }, modifier = Modifier.align(Alignment.End)) {
+                TextButton(
+                    onClick = { endDate = null },
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .defaultMinSize(minHeight = 48.dp),
+                ) {
                     Text("Clear end date")
                 }
             }
@@ -119,6 +126,8 @@ fun PeriodLogSheet(
                         selected = flow == level,
                         onClick = { flow = if (flow == level) null else level },
                         label = { Text(level.label) },
+                        // Stock chips are 32dp tall; the floor keeps them tappable.
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp),
                     )
                 }
             }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
@@ -61,12 +62,12 @@ import com.bloomcycle.app.ui.theme.Spacing
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
-private enum class OnboardingStep { WELCOME, BIRTH, LAST_PERIOD, TYPICAL_LENGTH, CONTEXT, NOTIFICATIONS }
+private enum class OnboardingStep { WELCOME, BIRTH, LAST_PERIOD, TYPICAL_LENGTH, CONTEXT, PRIVACY, NOTIFICATIONS }
 
 private enum class OnboardingPick { NONE, BIRTH, LAST_PERIOD }
 
 /**
- * Six screens, one decision each, all of it optional except finishing.
+ * Seven screens, one decision each, all of it optional except finishing.
  *
  * Deliberately lives outside the navigation suite: onboarding is not a place the user can
  * wander back to, so it renders instead of the shell rather than as a route in it.
@@ -150,7 +151,10 @@ fun OnboardingScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (stepIndex > 0) {
-                        TextButton(onClick = { stepIndex-- }) { Text("Back") }
+                        TextButton(
+                            onClick = { stepIndex-- },
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                        ) { Text("Back") }
                     }
                     Text(
                         text = "Step ${stepIndex + 1} of ${steps.size}",
@@ -242,7 +246,8 @@ fun OnboardingScreen(
                     StepCopy(
                         title = "A quiet place for your cycle",
                         body = "Log a period in a few seconds, see where you are today, and keep it " +
-                            "on this device — encrypted. No account, no feed, no streaks.",
+                            "on this device — encrypted. No account, no feed, no streaks. " +
+                            "(Only chat posts ever leave the phone — more on that later.)",
                     )
                 }
 
@@ -259,7 +264,10 @@ fun OnboardingScreen(
                         onClick = { picking = OnboardingPick.BIRTH.name },
                     )
                     if (birthDateIso != null) {
-                        TextButton(onClick = { birthDateIso = null }) { Text("Clear") }
+                        TextButton(
+                            onClick = { birthDateIso = null },
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                        ) { Text("Clear") }
                     }
                     Text(
                         text = "You can skip this.",
@@ -281,7 +289,10 @@ fun OnboardingScreen(
                         onClick = { picking = OnboardingPick.LAST_PERIOD.name },
                     )
                     if (lastPeriodIso != null) {
-                        TextButton(onClick = { lastPeriodIso = null }) { Text("Clear") }
+                        TextButton(
+                            onClick = { lastPeriodIso = null },
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                        ) { Text("Clear") }
                     }
                 }
 
@@ -327,6 +338,24 @@ fun OnboardingScreen(
                             onSelect = { contextName = option.name },
                         )
                     }
+                }
+
+                OnboardingStep.PRIVACY -> {
+                    StepCopy(
+                        title = "Where your data lives",
+                        body = "Your cycles stay on this phone, encrypted with a key only " +
+                            "you hold. There is no account, and clearing the app's data " +
+                            "removes them for good.",
+                    )
+                    Gap(Spacing.xs)
+                    Text(
+                        text = "Chat is the one exception: anything you post goes to our " +
+                            "servers so the room can read it. Posts carry a made-up name " +
+                            "and a coarse phase label only — never your name, your dates " +
+                            "or your birth date.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
 
                 OnboardingStep.NOTIFICATIONS -> {
