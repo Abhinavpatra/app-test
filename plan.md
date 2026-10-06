@@ -120,7 +120,7 @@ One branch → PR → merge per phase, never a direct push to `main`. Pattern:
 | 10 premium analyses | `phase-10-premium-analyses` | #12 ✅ |
 | 11 chat (on-device half) | `phase-11-chat` | #13 ✅ |
 | 11b chat (Firebase backend) | `phase-11b-firebase` | #14 ✅ |
-| 12a polish (device-independent) | `phase-12-polish` | #15 ⬜ |
+| 12a polish (device-independent) | `phase-12-polish` | #15 ✅ |
 
 `origin` = `https://github.com/Abhinavpatra/app-test.git`, `gh` v2.69.0 authenticated as
 `Abhinavpatra`. Run `git log --oneline -10` for the live list.
